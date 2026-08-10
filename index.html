@@ -6,15 +6,11 @@
     <title>เลือกแบบฝึกหัด</title>
     <style>
         body { font-family: sans-serif; background-color: #f4f4f4; text-align: center; margin: 0; padding: 20px; }
-        
-        /* ช่องค้นหา */
         .search-box { margin-bottom: 20px; }
         .search-box input { 
             padding: 12px; width: 80%; max-width: 400px; 
             font-size: 16px; border: 2px solid #ccc; border-radius: 8px; 
         }
-
-        /* แกลเลอรี่ */
         .gallery { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; }
         .gallery-item { text-align: center; }
         .gallery-item img { 
@@ -23,6 +19,7 @@
         }
         .gallery-item img:hover { border-color: #007AFF; transform: scale(1.05); }
         .gallery-item p { margin-top: 5px; font-size: 14px; color: #333; }
+        .loader { color: #888; font-size: 18px; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -30,47 +27,60 @@
     <h2>🔍 ค้นหาและเลือกแบบฝึกหัด</h2>
     
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="พิมพ์ชื่อแบบฝึกหัดเพื่อค้นหา..." onkeyup="filterImages()">
+        <input type="text" id="searchInput" placeholder="พิมพ์ชื่อแบบฝึกหัดเพื่อค้นหา...">
     </div>
 
-    <div class="gallery" id="gallery"></div>
+    <div class="gallery" id="gallery">
+        <div class="loader" id="loader">กำลังโหลดข้อมูลแบบฝึกหัด...</div>
+    </div>
 
-    <script>
+    <!-- เรียกใช้ Firebase แบบ Module -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD6X-sBEO8AqZF2i0qzJqyrwLU5FVtqQ5s",
+            authDomain: "ipad-drawing-app.firebaseapp.com",
+            projectId: "ipad-drawing-app",
+            storageBucket: "ipad-drawing-app.firebasestorage.app",
+            messagingSenderId: "1039285685408",
+            appId: "1:1039285685408:web:d1ae93d102084e2c3c0dc5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         const galleryDiv = document.getElementById('gallery');
-        let allImages = []; // ตัวแปรสำหรับเก็บข้อมูลรูปทั้งหมดไว้ทำระบบค้นหา
+        const loader = document.getElementById('loader');
+        let allImages = [];
 
-        // ==========================================
-        // 🚨 ใส่ลิงก์ CSV จาก Google Sheets ตรงนี้ 🚨
-        // ==========================================
-        const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQqqPUoTOiLWK3K7td1PSnk3qxRJL3HziMYQGZAVMPi4QYZ1PLWQyiEP_e4ihJ5KCysHEMkJL6gV5MZ/pub?gid=0&single=true&output=csv'; 
-
-        async function fetchImagesFromSheets() {
+        async function fetchImagesFromFirestore() {
             try {
-                const response = await fetch(sheetCsvUrl);
-                const text = await response.text();
-                const rows = text.split('\n').slice(1); 
+                // ดึงข้อมูลจากคอลเลกชัน workbooks โดยเรียงลำดับเวลาสร้าง
+                const q = query(collection(db, "workbooks"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
                 
-                rows.forEach(row => {
-                    const columns = row.split(','); 
-                    if(columns.length >= 2) {
-                        const name = columns[0].trim();
-                        const url = columns[1].trim();
-                        if(url) {
-                            allImages.push({ name, url }); // เก็บลง Array
-                        }
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if(data.url && data.name) {
+                        allImages.push({ name: data.name, url: data.url });
                     }
                 });
-                renderGallery(allImages); // นำไปแสดงผล
+
+                loader.style.display = 'none';
+                renderGallery(allImages);
+
             } catch (error) {
+                console.error("Error fetching documents: ", error);
                 galleryDiv.innerHTML = "<p>ไม่สามารถโหลดรูปภาพได้</p>";
             }
         }
 
-        // ฟังก์ชันสร้างแกลเลอรี่
         function renderGallery(imagesToRender) {
-            galleryDiv.innerHTML = ''; // ล้างของเก่าก่อน
+            galleryDiv.innerHTML = ''; 
             if(imagesToRender.length === 0) {
-                galleryDiv.innerHTML = "<p>ไม่พบรูปภาพที่ค้นหา</p>";
+                galleryDiv.innerHTML = "<p>ไม่พบรูปภาพในระบบ</p>";
                 return;
             }
 
@@ -81,7 +91,6 @@
                 const img = document.createElement('img');
                 img.src = item.url;
                 img.alt = item.name;
-                // ✨ เมื่อกดที่รูป ให้เปลี่ยนหน้าไปที่ edit.html พร้อมแนบ URL รูปไปด้วย ✨
                 img.onclick = () => {
                     window.location.href = `edit.html?img=${encodeURIComponent(item.url)}`;
                 };
@@ -95,15 +104,15 @@
             });
         }
 
-        // ฟังก์ชันค้นหารูปภาพ
-        function filterImages() {
-            const searchText = document.getElementById('searchInput').value.toLowerCase();
+        // ระบบค้นหา
+        document.getElementById('searchInput').addEventListener('keyup', (e) => {
+            const searchText = e.target.value.toLowerCase();
             const filtered = allImages.filter(item => item.name.toLowerCase().includes(searchText));
             renderGallery(filtered);
-        }
+        });
 
         // เริ่มโหลดข้อมูล
-        fetchImagesFromSheets();
+        fetchImagesFromFirestore();
     </script>
 </body>
 </html>

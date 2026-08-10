@@ -20,6 +20,7 @@
             cursor: pointer; width: 100%; transition: 0.2s;
         }
         button:hover { background: #005bb5; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
         #status { margin-top: 20px; font-weight: bold; color: #333; }
         .loading { color: #FF9500 !important; }
         .success { color: #34C759 !important; }
@@ -30,30 +31,43 @@
 
     <div class="upload-box">
         <h2>📁 เพิ่มแบบฝึกหัดใหม่</h2>
-        <p>อัปโหลดรูปภาพ ระบบจะส่งเข้า Google Sheets อัตโนมัติ</p>
+        <p>อัปโหลดรูปลงระบบ ฐานข้อมูลจะอัปเดตทันที</p>
 
         <input type="text" id="fileName" placeholder="ตั้งชื่อแบบฝึกหัด..." required>
         <input type="file" id="fileInput" accept="image/*" required>
         
-        <button id="uploadBtn" onclick="uploadData()">🚀 อัปโหลดเข้าสู่ระบบ</button>
+        <button id="uploadBtn">🚀 อัปโหลดเข้าสู่ระบบ</button>
 
         <div id="status"></div>
         
-        <!-- ปุ่มกลับหน้าหลัก -->
         <br>
         <button style="background: #555; padding: 10px 20px; font-size: 14px; width: auto;" onclick="window.location.href='index.html'">⬅️ กลับหน้าเลือกแบบฝึกหัด</button>
     </div>
 
-    <script>
-        // ========================================================
-        // ข้อมูลการเชื่อมต่อ API และ Google Forms (ใส่ให้ครบแล้ว!)
-        const IMGBB_API_KEY = 'e0fa69420791826c629b428735db5af8';
-        const GOOGLE_FORM_ID = '1FAIpQLSc3q4xlCqfqM1bZhDFbJE2JVs58Jc6qeaRH7z_Q41bjC6R4qQ'; 
-        const ENTRY_NAME = '1353059354';
-        const ENTRY_URL = '1637421390';
-        // ========================================================
+    <!-- เรียกใช้ Firebase แบบ Module -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        async function uploadData() {
+        // 1. นำ Firebase Config ของคุณมาใส่เรียบร้อยแล้ว
+        const firebaseConfig = {
+            apiKey: "AIzaSyD6X-sBEO8AqZF2i0qzJqyrwLU5FVtqQ5s",
+            authDomain: "ipad-drawing-app.firebaseapp.com",
+            projectId: "ipad-drawing-app",
+            storageBucket: "ipad-drawing-app.firebasestorage.app",
+            messagingSenderId: "1039285685408",
+            appId: "1:1039285685408:web:d1ae93d102084e2c3c0dc5"
+        };
+
+        // เริ่มต้นการทำงานของ Firebase และ Firestore
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // API Key ของ ImgBB
+        const IMGBB_API_KEY = 'e0fa69420791826c629b428735db5af8';
+
+        // ฟังก์ชันอัปโหลด
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
             const fileName = document.getElementById('fileName').value;
             const fileInput = document.getElementById('fileInput').files[0];
             const statusDiv = document.getElementById('status');
@@ -67,10 +81,9 @@
             statusDiv.innerHTML = "⏳ กำลังอัปโหลดรูปภาพไปยัง Server...";
             statusDiv.className = "loading";
             btn.disabled = true;
-            btn.style.background = "#ccc";
 
             try {
-                // 1. อัปโหลดรูปขึ้น ImgBB
+                // ขั้นที่ 1: อัปโหลดรูปขึ้น ImgBB
                 const formData = new FormData();
                 formData.append('image', fileInput);
 
@@ -83,25 +96,18 @@
                 if (!imgbbData.success) throw new Error("อัปโหลดรูปไม่สำเร็จ");
                 const imageUrl = imgbbData.data.url; 
 
-                // 2. ส่งข้อมูล (ชื่อ + ลิงก์รูป) เข้า Google Forms
-                statusDiv.innerHTML = "⏳ กำลังบันทึกข้อมูลลงฐานข้อมูล...";
+                // ขั้นที่ 2: บันทึกชื่อและลิงก์ลง Firestore
+                statusDiv.innerHTML = "⏳ กำลังบันทึกลงฐานข้อมูล Firebase...";
                 
-                const formPostUrl = `https://docs.google.com/forms/d/e/${GOOGLE_FORM_ID}/formResponse`;
-                const formBody = new URLSearchParams();
-                formBody.append(`entry.${ENTRY_NAME}`, fileName);
-                formBody.append(`entry.${ENTRY_URL}`, imageUrl);
-
-                await fetch(formPostUrl, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: formBody
+                await addDoc(collection(db, "workbooks"), {
+                    name: fileName,
+                    url: imageUrl,
+                    createdAt: serverTimestamp() // เก็บเวลาที่อัปโหลดด้วย
                 });
 
-                // สำเร็จ!
                 statusDiv.innerHTML = "✅ อัปโหลดสำเร็จเรียบร้อย! สามารถกลับไปดูที่หน้าหลักได้เลย";
                 statusDiv.className = "success";
                 
-                // เคลียร์ช่องกรอกข้อมูล
                 document.getElementById('fileName').value = '';
                 document.getElementById('fileInput').value = '';
 
@@ -111,9 +117,8 @@
                 statusDiv.className = "error";
             } finally {
                 btn.disabled = false;
-                btn.style.background = "#007AFF";
             }
-        }
+        });
     </script>
 </body>
 </html>

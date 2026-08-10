@@ -6,85 +6,59 @@
     <title>พื้นที่ทำแบบฝึกหัด (เรียงต่อกันหลายหน้า)</title>
     <style>
         body { font-family: sans-serif; background-color: #e9ecef; text-align: center; margin: 0; padding: 15px; }
-        
-        /* แถบเครื่องมือด้านบน (ล็อกติดขอบบนไว้เสมอ) */
         .header-tools { 
             position: sticky; top: 0; z-index: 100;
             background: white; padding: 15px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
         }
-        
         button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 8px; border: none; color: white; font-weight: bold; transition: 0.2s;}
         button:active { transform: scale(0.95); }
         .btn-back { background: #555; }
         .btn-save { background: #34C759; }
-        
-        /* ปุ่มสลับโหมด */
         #btnToggleMode { background: #007AFF; font-size: 18px; padding: 10px 30px;}
-        
-        /* พื้นที่วางกระดาษ */
         #workspace { width: 100%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
-        
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
-        
         canvas { max-width: 100%; height: auto; display: block; }
-
-        /* CSS ควบคุมโหมด: ถ้าเป็นโหมดวาด จะล็อกจอ / ถ้าโหมดเลื่อน จะปล่อยผ่านการสัมผัส */
         .mode-draw canvas { touch-action: none; cursor: crosshair; }
         .mode-scroll canvas { touch-action: auto; pointer-events: none; }
-        
     </style>
 </head>
 <body>
 
     <div class="header-tools">
         <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
-        
-        <!-- ✨ ปุ่มพระเอกของเรา สลับโหมดวาด/เลื่อน ✨ -->
         <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาดเขียน</button>
-        
         <button class="btn-save" onclick="downloadAll()">💾 เซฟทั้งหมดลงเครื่อง</button>
     </div>
 
-    <!-- โหมดเริ่มต้นคือโหมดวาดเขียน (mode-draw) -->
-    <div id="workspace" class="mode-draw">
-        <!-- กระดาษแต่ละหน้าจะถูกสร้างออโต้มาใส่ในนี้ -->
-    </div>
+    <div id="workspace" class="mode-draw"></div>
 
     <script>
         const workspace = document.getElementById('workspace');
         let currentMode = 'draw';
-        let originalImages = []; // เก็บรูปต้นฉบับไว้
+        let originalImages = []; 
 
-        // ==========================================
-        // 1. ระบบสลับโหมด (Draw / Scroll)
-        // ==========================================
         function toggleMode() {
             const btn = document.getElementById('btnToggleMode');
             if (currentMode === 'draw') {
                 currentMode = 'scroll';
-                workspace.className = 'mode-scroll'; // เปลี่ยน CSS Class
+                workspace.className = 'mode-scroll'; 
                 btn.innerHTML = '👆 โหมดเลื่อนหน้าจอ';
-                btn.style.background = '#FF9500'; // เปลี่ยนเป็นสีส้ม
+                btn.style.background = '#FF9500'; 
             } else {
                 currentMode = 'draw';
                 workspace.className = 'mode-draw';
                 btn.innerHTML = '✍️ โหมดวาดเขียน';
-                btn.style.background = '#007AFF'; // เปลี่ยนกลับเป็นสีฟ้า
+                btn.style.background = '#007AFF'; 
             }
         }
 
-        // ==========================================
-        // 2. ดึง URL รูปภาพทั้งหมดจากแถบที่อยู่เว็บ
-        // ==========================================
         const urlParams = new URLSearchParams(window.location.search);
         const imageUrlFromUrl = urlParams.get('img');
 
         if (imageUrlFromUrl) {
             const pages = imageUrlFromUrl.split('|').map(url => url.trim());
-            
-            // วนลูปสร้าง Canvas ตามจำนวนหน้า
             pages.forEach((url, index) => {
                 createCanvasPage(url, index);
             });
@@ -93,22 +67,13 @@
             window.location.href = 'index.html';
         }
 
-        // ==========================================
-        // 3. ฟังก์ชันสร้างหน้ากระดาษ (1 Canvas / 1 รูป)
-        // ==========================================
         function createCanvasPage(url, index) {
-            // สร้างกรอบหุ้ม
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
-            
-            // สร้าง Canvas
             const canvas = document.createElement('canvas');
             canvas.id = `canvas-page-${index}`;
-            
             wrapper.appendChild(canvas);
             workspace.appendChild(wrapper);
-
-            // เซ็ตระบบวาดเขียนให้ Canvas แผ่นนี้
             setupDrawingSystem(canvas, url, index);
         }
 
@@ -117,7 +82,6 @@
             let isDrawing = false;
             let lastX = 0, lastY = 0;
 
-            // โหลดรูปลงแผ่นกระดาษ
             const img = new Image();
             img.crossOrigin = "anonymous"; 
             img.onload = () => {
@@ -128,7 +92,6 @@
             };
             img.src = url;
 
-            // ฟังก์ชันคำนวณพิกัด
             function getPos(e) {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
@@ -139,12 +102,7 @@
                 };
             }
 
-            // เหตุการณ์ตอนแตะ/วาด
             canvas.addEventListener('pointerdown', (e) => {
-                // ถ้ายูสเซอร์เผลอใช้มือในโหมดวาด จะได้ไม่เกิดเส้นมั่ว
-                if (e.pointerType === 'touch' && currentMode === 'draw') {
-                    // อนุญาตให้วาดด้วยนิ้วได้ หรือจะบล็อคก็ได้ (ตอนนี้ปล่อยให้วาดได้)
-                }
                 isDrawing = true;
                 const pos = getPos(e);
                 lastX = pos.x;
@@ -154,8 +112,8 @@
             canvas.addEventListener('pointermove', (e) => {
                 if (!isDrawing) return;
                 const pos = getPos(e);
-                
                 let pressure = e.pressure !== undefined ? e.pressure : 0.5;
+                
                 ctx.lineWidth = (pressure * 12) + 2; 
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
@@ -174,21 +132,17 @@
             canvas.addEventListener('pointercancel', () => isDrawing = false);
         }
 
-        // ==========================================
-        // 4. บันทึกรูปภาพทุกหน้า
-        // ==========================================
         function downloadAll() {
             const canvases = document.querySelectorAll('canvas');
             if (canvases.length === 0) return;
 
-            // ตั้งดีเลย์เล็กน้อยเวลาเซฟหลายรูปพร้อมกัน ป้องกันเบราว์เซอร์เอ๋อ
             canvases.forEach((canvas, index) => {
                 setTimeout(() => {
                     const link = document.createElement('a');
                     link.download = `แบบฝึกหัด-หน้า-${index + 1}.png`;
                     link.href = canvas.toDataURL('image/png');
                     link.click();
-                }, index * 300); // ดีเลย์รูปละ 0.3 วินาที
+                }, index * 300); 
             });
         }
     </script>
