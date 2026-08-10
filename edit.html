@@ -3,131 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>พื้นที่ทำแบบฝึกหัด</title>
+    <title>พื้นที่ทำแบบฝึกหัด (เรียงต่อกันหลายหน้า)</title>
     <style>
-        body { font-family: sans-serif; background-color: #f4f4f4; text-align: center; margin: 0; padding: 20px; }
+        body { font-family: sans-serif; background-color: #e9ecef; text-align: center; margin: 0; padding: 15px; }
         
-        .header-tools { margin-bottom: 20px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; color: white; font-weight: bold;}
-        .btn-back { background: #555; }
-        .btn-clear { background: #FF3B30; }
-        .btn-save { background: #007AFF; }
-
-        #workspace { width: 100%; max-width: 800px; margin: 0 auto; overflow: hidden; }
-        canvas {
-            background-color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 8px;
-            max-width: 100%; height: auto;
-            touch-action: none; 
-            cursor: crosshair;
+        /* แถบเครื่องมือด้านบน (ล็อกติดขอบบนไว้เสมอ) */
+        .header-tools { 
+            position: sticky; top: 0; z-index: 100;
+            background: white; padding: 15px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
         }
+        
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 8px; border: none; color: white; font-weight: bold; transition: 0.2s;}
+        button:active { transform: scale(0.95); }
+        .btn-back { background: #555; }
+        .btn-save { background: #34C759; }
+        
+        /* ปุ่มสลับโหมด */
+        #btnToggleMode { background: #007AFF; font-size: 18px; padding: 10px 30px;}
+        
+        /* พื้นที่วางกระดาษ */
+        #workspace { width: 100%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
+        
+        .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
+        
+        canvas { max-width: 100%; height: auto; display: block; }
+
+        /* CSS ควบคุมโหมด: ถ้าเป็นโหมดวาด จะล็อกจอ / ถ้าโหมดเลื่อน จะปล่อยผ่านการสัมผัส */
+        .mode-draw canvas { touch-action: none; cursor: crosshair; }
+        .mode-scroll canvas { touch-action: auto; pointer-events: none; }
+        
     </style>
 </head>
 <body>
 
     <div class="header-tools">
-        <!-- ปุ่มกลับไปหน้าเลือกรูป -->
-        <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับหน้าหลัก</button>
-        <button class="btn-clear" onclick="clearCanvas()">ล้างเส้นทั้งหมด</button>
-        <button class="btn-save" onclick="downloadImage()">💾 บันทึกรูปภาพ</button>
+        <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
+        
+        <!-- ✨ ปุ่มพระเอกของเรา สลับโหมดวาด/เลื่อน ✨ -->
+        <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาดเขียน</button>
+        
+        <button class="btn-save" onclick="downloadAll()">💾 เซฟทั้งหมดลงเครื่อง</button>
     </div>
 
-    <div id="workspace">
-        <canvas id="drawingCanvas"></canvas>
+    <!-- โหมดเริ่มต้นคือโหมดวาดเขียน (mode-draw) -->
+    <div id="workspace" class="mode-draw">
+        <!-- กระดาษแต่ละหน้าจะถูกสร้างออโต้มาใส่ในนี้ -->
     </div>
 
     <script>
-        const canvas = document.getElementById('drawingCanvas');
-        const ctx = canvas.getContext('2d');
-        let isDrawing = false;
-        let lastX = 0, lastY = 0;
-        let currentImage = null;
+        const workspace = document.getElementById('workspace');
+        let currentMode = 'draw';
+        let originalImages = []; // เก็บรูปต้นฉบับไว้
 
         // ==========================================
-        // 1. ดึง URL รูปภาพจากแถบที่อยู่เว็บ (URL Parameters)
+        // 1. ระบบสลับโหมด (Draw / Scroll)
+        // ==========================================
+        function toggleMode() {
+            const btn = document.getElementById('btnToggleMode');
+            if (currentMode === 'draw') {
+                currentMode = 'scroll';
+                workspace.className = 'mode-scroll'; // เปลี่ยน CSS Class
+                btn.innerHTML = '👆 โหมดเลื่อนหน้าจอ';
+                btn.style.background = '#FF9500'; // เปลี่ยนเป็นสีส้ม
+            } else {
+                currentMode = 'draw';
+                workspace.className = 'mode-draw';
+                btn.innerHTML = '✍️ โหมดวาดเขียน';
+                btn.style.background = '#007AFF'; // เปลี่ยนกลับเป็นสีฟ้า
+            }
+        }
+
+        // ==========================================
+        // 2. ดึง URL รูปภาพทั้งหมดจากแถบที่อยู่เว็บ
         // ==========================================
         const urlParams = new URLSearchParams(window.location.search);
         const imageUrlFromUrl = urlParams.get('img');
 
         if (imageUrlFromUrl) {
-            loadImageToCanvas(imageUrlFromUrl);
+            const pages = imageUrlFromUrl.split('|').map(url => url.trim());
+            
+            // วนลูปสร้าง Canvas ตามจำนวนหน้า
+            pages.forEach((url, index) => {
+                createCanvasPage(url, index);
+            });
         } else {
-            alert("ไม่พบข้อมูลรูปภาพ กรุณาเลือกรูปจากหน้าหลักใหม่");
-            window.location.href = 'index.html'; // เตะกลับหน้าแรกถ้าไม่มีรูป
+            alert("ไม่พบข้อมูลรูปภาพ กรุณาเลือกรูปใหม่");
+            window.location.href = 'index.html';
         }
 
         // ==========================================
-        // 2. โหลดรูปลง Canvas
+        // 3. ฟังก์ชันสร้างหน้ากระดาษ (1 Canvas / 1 รูป)
         // ==========================================
-        function loadImageToCanvas(url) {
+        function createCanvasPage(url, index) {
+            // สร้างกรอบหุ้ม
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
+            
+            // สร้าง Canvas
+            const canvas = document.createElement('canvas');
+            canvas.id = `canvas-page-${index}`;
+            
+            wrapper.appendChild(canvas);
+            workspace.appendChild(wrapper);
+
+            // เซ็ตระบบวาดเขียนให้ Canvas แผ่นนี้
+            setupDrawingSystem(canvas, url, index);
+        }
+
+        function setupDrawingSystem(canvas, url, index) {
+            const ctx = canvas.getContext('2d');
+            let isDrawing = false;
+            let lastX = 0, lastY = 0;
+
+            // โหลดรูปลงแผ่นกระดาษ
             const img = new Image();
             img.crossOrigin = "anonymous"; 
             img.onload = () => {
                 canvas.width = img.width;
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
-                currentImage = img;
+                originalImages[index] = img;
             };
             img.src = url;
-        }
 
-        // ==========================================
-        // 3. ระบบวาดเขียน (Apple Pencil)
-        // ==========================================
-        function getPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            return {
-                x: (e.clientX - rect.left) * scaleX,
-                y: (e.clientY - rect.top) * scaleY
-            };
-        }
-
-        canvas.addEventListener('pointerdown', (e) => {
-            isDrawing = true;
-            const pos = getPos(e);
-            lastX = pos.x;
-            lastY = pos.y;
-        });
-
-        canvas.addEventListener('pointermove', (e) => {
-            if (!isDrawing) return;
-            const pos = getPos(e);
-
-            let pressure = e.pressure !== undefined ? e.pressure : 0.5;
-            ctx.lineWidth = (pressure * 12) + 2; 
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.strokeStyle = '#000000'; 
-
-            ctx.beginPath();
-            ctx.moveTo(lastX, lastY);
-            ctx.lineTo(pos.x, pos.y);
-            ctx.stroke();
-
-            lastX = pos.x;
-            lastY = pos.y;
-        });
-
-        canvas.addEventListener('pointerup', () => isDrawing = false);
-        canvas.addEventListener('pointercancel', () => isDrawing = false);
-
-        // ==========================================
-        // 4. ปุ่มเครื่องมือ
-        // ==========================================
-        function clearCanvas() {
-            if (currentImage) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(currentImage, 0, 0);
+            // ฟังก์ชันคำนวณพิกัด
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
             }
+
+            // เหตุการณ์ตอนแตะ/วาด
+            canvas.addEventListener('pointerdown', (e) => {
+                // ถ้ายูสเซอร์เผลอใช้มือในโหมดวาด จะได้ไม่เกิดเส้นมั่ว
+                if (e.pointerType === 'touch' && currentMode === 'draw') {
+                    // อนุญาตให้วาดด้วยนิ้วได้ หรือจะบล็อคก็ได้ (ตอนนี้ปล่อยให้วาดได้)
+                }
+                isDrawing = true;
+                const pos = getPos(e);
+                lastX = pos.x;
+                lastY = pos.y;
+            });
+
+            canvas.addEventListener('pointermove', (e) => {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                
+                let pressure = e.pressure !== undefined ? e.pressure : 0.5;
+                ctx.lineWidth = (pressure * 12) + 2; 
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#000000'; 
+
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+
+                lastX = pos.x;
+                lastY = pos.y;
+            });
+
+            canvas.addEventListener('pointerup', () => isDrawing = false);
+            canvas.addEventListener('pointercancel', () => isDrawing = false);
         }
 
-        function downloadImage() {
-            if(!currentImage) return;
-            const link = document.createElement('a');
-            link.download = 'my-drawing.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+        // ==========================================
+        // 4. บันทึกรูปภาพทุกหน้า
+        // ==========================================
+        function downloadAll() {
+            const canvases = document.querySelectorAll('canvas');
+            if (canvases.length === 0) return;
+
+            // ตั้งดีเลย์เล็กน้อยเวลาเซฟหลายรูปพร้อมกัน ป้องกันเบราว์เซอร์เอ๋อ
+            canvases.forEach((canvas, index) => {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.download = `แบบฝึกหัด-หน้า-${index + 1}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                }, index * 300); // ดีเลย์รูปละ 0.3 วินาที
+            });
         }
     </script>
 </body>
