@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>พื้นที่ทำแบบฝึกหัด</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f4; text-align: center; margin: 0; padding: 20px; }
+        
+        .header-tools { margin-bottom: 20px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; color: white; font-weight: bold;}
+        .btn-back { background: #555; }
+        .btn-clear { background: #FF3B30; }
+        .btn-save { background: #007AFF; }
+
+        #workspace { width: 100%; max-width: 800px; margin: 0 auto; overflow: hidden; }
+        canvas {
+            background-color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 8px;
+            max-width: 100%; height: auto;
+            touch-action: none; 
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-tools">
+        <!-- ปุ่มกลับไปหน้าเลือกรูป -->
+        <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับหน้าหลัก</button>
+        <button class="btn-clear" onclick="clearCanvas()">ล้างเส้นทั้งหมด</button>
+        <button class="btn-save" onclick="downloadImage()">💾 บันทึกรูปภาพ</button>
+    </div>
+
+    <div id="workspace">
+        <canvas id="drawingCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+        let currentImage = null;
+
+        // ==========================================
+        // 1. ดึง URL รูปภาพจากแถบที่อยู่เว็บ (URL Parameters)
+        // ==========================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const imageUrlFromUrl = urlParams.get('img');
+
+        if (imageUrlFromUrl) {
+            loadImageToCanvas(imageUrlFromUrl);
+        } else {
+            alert("ไม่พบข้อมูลรูปภาพ กรุณาเลือกรูปจากหน้าหลักใหม่");
+            window.location.href = 'index.html'; // เตะกลับหน้าแรกถ้าไม่มีรูป
+        }
+
+        // ==========================================
+        // 2. โหลดรูปลง Canvas
+        // ==========================================
+        function loadImageToCanvas(url) {
+            const img = new Image();
+            img.crossOrigin = "anonymous"; 
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                currentImage = img;
+            };
+            img.src = url;
+        }
+
+        // ==========================================
+        // 3. ระบบวาดเขียน (Apple Pencil)
+        // ==========================================
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            isDrawing = true;
+            const pos = getPos(e);
+            lastX = pos.x;
+            lastY = pos.y;
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isDrawing) return;
+            const pos = getPos(e);
+
+            let pressure = e.pressure !== undefined ? e.pressure : 0.5;
+            ctx.lineWidth = (pressure * 12) + 2; 
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000000'; 
+
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+
+            lastX = pos.x;
+            lastY = pos.y;
+        });
+
+        canvas.addEventListener('pointerup', () => isDrawing = false);
+        canvas.addEventListener('pointercancel', () => isDrawing = false);
+
+        // ==========================================
+        // 4. ปุ่มเครื่องมือ
+        // ==========================================
+        function clearCanvas() {
+            if (currentImage) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(currentImage, 0, 0);
+            }
+        }
+
+        function downloadImage() {
+            if(!currentImage) return;
+            const link = document.createElement('a');
+            link.download = 'my-drawing.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+</html>
