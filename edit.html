@@ -3,42 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>พื้นที่ทำแบบฝึกหัด (เรียงต่อกันหลายหน้า)</title>
+    <title>พื้นที่ทำแบบฝึกหัด (Pro Mode)</title>
     <style>
         body { font-family: sans-serif; background-color: #e9ecef; text-align: center; margin: 0; padding: 15px; }
+        
+        /* แถบเครื่องมือหลัก */
         .header-tools { 
             position: sticky; top: 0; z-index: 100;
             background: white; padding: 15px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+            display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;
         }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 8px; border: none; color: white; font-weight: bold; transition: 0.2s;}
+        .top-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .bottom-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; background: #f8f9fa; padding: 10px; border-radius: 8px;}
+        
+        button { padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; transition: 0.2s;}
         button:active { transform: scale(0.95); }
-        .btn-back { background: #555; }
-        .btn-save { background: #34C759; }
-        #btnToggleMode { background: #007AFF; font-size: 18px; padding: 10px 30px;}
+        
+        /* ปุ่มหลัก */
+        .btn-back { background: #555; color: white; }
+        .btn-save { background: #34C759; color: white; }
+        #btnToggleMode { background: #007AFF; color: white; font-size: 16px; padding: 10px 25px;}
+        
+        /* ปุ่มเครื่องมือวาด */
+        .tool-btn { background: #e0e0e0; color: #333; border: 2px solid transparent; }
+        .tool-btn.active { border: 2px solid #007AFF; background: #d1e7dd; }
+        
+        /* สีปากกา */
+        .color-black { border-bottom: 4px solid #000; }
+        .color-red { border-bottom: 4px solid #FF3B30; }
+        .color-blue { border-bottom: 4px solid #007AFF; }
+        .color-highlighter { border-bottom: 4px solid #FFCC00; }
+        
+        /* พื้นที่วางกระดาษ */
         #workspace { width: 100%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
+        
+        /* จัดการกระดาษให้อยู่ซ้อนกัน (โจทย์อยู่ล่าง รอยวาดอยู่บน) */
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
-        canvas { max-width: 100%; height: auto; display: block; }
-        .mode-draw canvas { touch-action: none; cursor: crosshair; }
+        .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        .mode-draw canvas { touch-action: none; cursor: crosshair; pointer-events: auto; }
         .mode-scroll canvas { touch-action: auto; pointer-events: none; }
     </style>
 </head>
 <body>
 
     <div class="header-tools">
-        <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
-        <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาดเขียน</button>
-        <button class="btn-save" onclick="downloadAll()">💾 เซฟทั้งหมดลงเครื่อง</button>
+        <!-- แถวบน: สลับโหมด / เซฟ -->
+        <div class="top-row">
+            <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
+            <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาดเขียน</button>
+            <button class="btn-save" onclick="downloadAll()">💾 เซฟรูป</button>
+        </div>
+        
+        <!-- แถวล่าง: เครื่องมือวาด (สไตล์ GoodNotes) -->
+        <div class="bottom-row" id="drawingTools">
+            <button class="tool-btn active color-black" onclick="setTool('pen', '#000000', this)">🖊️ ดำ</button>
+            <button class="tool-btn color-red" onclick="setTool('pen', '#FF3B30', this)">🖊️ แดง</button>
+            <button class="tool-btn color-blue" onclick="setTool('pen', '#007AFF', this)">🖊️ น้ำเงิน</button>
+            <button class="tool-btn color-highlighter" onclick="setTool('highlighter', '#FFCC00', this)">🖍️ ไฮไลท์</button>
+            <button class="tool-btn" onclick="setTool('eraser', null, this)">🧽 ยางลบ</button>
+            <span style="border-left: 2px solid #ccc; margin: 0 5px;"></span>
+            <button class="tool-btn" onclick="setSize(2, this)">เส้นเล็ก</button>
+            <button class="tool-btn active" onclick="setSize(5, this)">เส้นกลาง</button>
+            <button class="tool-btn" onclick="setSize(10, this)">เส้นใหญ่</button>
+        </div>
     </div>
 
-    <div id="workspace" class="mode-draw"></div>
+    <div id="workspace" class="mode-draw">
+        <!-- หน้ากระดาษจะถูกสร้างตรงนี้ -->
+    </div>
 
     <script>
         const workspace = document.getElementById('workspace');
+        const drawingTools = document.getElementById('drawingTools');
         let currentMode = 'draw';
-        let originalImages = []; 
+        
+        // สถานะเครื่องมือปัจจุบัน
+        let currentTool = 'pen'; // pen, highlighter, eraser
+        let currentColor = '#000000';
+        let currentSize = 5;
 
+        // ตัวแปรเก็บรูปภาพโจทย์เอาไว้ใช้ตอนเซฟ
+        let backgroundImages = []; 
+
+        // ==========================================
+        // 1. ระบบเครื่องมือ (Toolbox)
+        // ==========================================
         function toggleMode() {
             const btn = document.getElementById('btnToggleMode');
             if (currentMode === 'draw') {
@@ -46,14 +98,44 @@
                 workspace.className = 'mode-scroll'; 
                 btn.innerHTML = '👆 โหมดเลื่อนหน้าจอ';
                 btn.style.background = '#FF9500'; 
+                drawingTools.style.opacity = '0.5'; // ทำแถบเครื่องมือจางลง
+                drawingTools.style.pointerEvents = 'none';
             } else {
                 currentMode = 'draw';
                 workspace.className = 'mode-draw';
                 btn.innerHTML = '✍️ โหมดวาดเขียน';
                 btn.style.background = '#007AFF'; 
+                drawingTools.style.opacity = '1';
+                drawingTools.style.pointerEvents = 'auto';
             }
         }
 
+        function setTool(tool, color, btnElement) {
+            currentTool = tool;
+            if (color) currentColor = color;
+            
+            // เปลี่ยนปุ่มที่ Active
+            const btns = drawingTools.querySelectorAll('.tool-btn');
+            btns.forEach(b => {
+                if(b.innerText.includes('🖊️') || b.innerText.includes('🖍️') || b.innerText.includes('🧽')) {
+                    b.classList.remove('active');
+                }
+            });
+            btnElement.classList.add('active');
+        }
+
+        function setSize(size, btnElement) {
+            currentSize = size;
+            const btns = drawingTools.querySelectorAll('.tool-btn');
+            btns.forEach(b => {
+                if(b.innerText.includes('เส้น')) b.classList.remove('active');
+            });
+            btnElement.classList.add('active');
+        }
+
+        // ==========================================
+        // 2. โหลดรูปภาพ
+        // ==========================================
         const urlParams = new URLSearchParams(window.location.search);
         const imageUrlFromUrl = urlParams.get('img');
 
@@ -63,34 +145,48 @@
                 createCanvasPage(url, index);
             });
         } else {
-            alert("ไม่พบข้อมูลรูปภาพ กรุณาเลือกรูปใหม่");
+            alert("ไม่พบข้อมูลรูปภาพ");
             window.location.href = 'index.html';
         }
 
+        // ==========================================
+        // 3. สร้างกระดานวาด (แยกชั้นภาพโจทย์ กับ ชั้นวาด)
+        // ==========================================
         function createCanvasPage(url, index) {
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
+            
+            // ชั้นที่ 1: ภาพโจทย์ (อยู่ด้านล่าง)
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.className = "bg-img";
+            img.src = url;
+            
+            // ชั้นที่ 2: กระดานวาดใสๆ (อยู่ด้านบน)
             const canvas = document.createElement('canvas');
             canvas.id = `canvas-page-${index}`;
+            
+            // เมื่อโหลดภาพเสร็จ ให้ตั้งขนาด canvas ให้เท่ากับภาพจริง
+            img.onload = () => {
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                backgroundImages[index] = img; // เก็บไว้ใช้ตอนรวมภาพเซฟ
+            };
+
+            wrapper.appendChild(img);
             wrapper.appendChild(canvas);
             workspace.appendChild(wrapper);
-            setupDrawingSystem(canvas, url, index);
+
+            setupDrawingSystem(canvas);
         }
 
-        function setupDrawingSystem(canvas, url, index) {
+        // ==========================================
+        // 4. ระบบวาดเขียน
+        // ==========================================
+        function setupDrawingSystem(canvas) {
             const ctx = canvas.getContext('2d');
             let isDrawing = false;
             let lastX = 0, lastY = 0;
-
-            const img = new Image();
-            img.crossOrigin = "anonymous"; 
-            img.onload = () => {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                originalImages[index] = img;
-            };
-            img.src = url;
 
             function getPos(e) {
                 const rect = canvas.getBoundingClientRect();
@@ -113,11 +209,31 @@
                 if (!isDrawing) return;
                 const pos = getPos(e);
                 let pressure = e.pressure !== undefined ? e.pressure : 0.5;
+                if (e.pointerType === 'mouse') pressure = 0.5; // ถ้าใช้เมาส์ให้เส้นคงที่
                 
-                ctx.lineWidth = (pressure * 12) + 2; 
+                // ตั้งค่าเครื่องมือ
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.strokeStyle = '#000000'; 
+                
+                if (currentTool === 'eraser') {
+                    // ยางลบ (ลบเฉพาะหมึกใสๆ ให้ทะลุเห็นภาพโจทย์)
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = currentSize * 5; // ยางลบจะขนาดใหญ่กว่าปกติ
+                    ctx.strokeStyle = "rgba(0,0,0,1)";
+                } else if (currentTool === 'highlighter') {
+                    // ไฮไลท์
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha = 0.4; // โปร่งแสง
+                    ctx.lineWidth = currentSize * 4;
+                    ctx.strokeStyle = currentColor;
+                } else {
+                    // ปากกาปกติ
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.globalAlpha = 1.0;
+                    // น้ำหนักเส้นตามแรงกด (ถ้าใช้ Apple Pencil)
+                    ctx.lineWidth = (pressure * currentSize * 2) + 1; 
+                    ctx.strokeStyle = currentColor;
+                }
 
                 ctx.beginPath();
                 ctx.moveTo(lastX, lastY);
@@ -128,21 +244,39 @@
                 lastY = pos.y;
             });
 
-            canvas.addEventListener('pointerup', () => isDrawing = false);
-            canvas.addEventListener('pointercancel', () => isDrawing = false);
+            const stopDrawing = () => isDrawing = false;
+            canvas.addEventListener('pointerup', stopDrawing);
+            canvas.addEventListener('pointercancel', stopDrawing);
         }
 
+        // ==========================================
+        // 5. บันทึกรูปภาพ (รวมโจทย์ + รอยวาด)
+        // ==========================================
         function downloadAll() {
             const canvases = document.querySelectorAll('canvas');
             if (canvases.length === 0) return;
 
-            canvases.forEach((canvas, index) => {
+            canvases.forEach((drawCanvas, index) => {
                 setTimeout(() => {
+                    // สร้าง Canvas ชั่วคราวเพื่อนำภาพโจทย์มารวมกับรอยวาด
+                    const exportCanvas = document.createElement('canvas');
+                    exportCanvas.width = drawCanvas.width;
+                    exportCanvas.height = drawCanvas.height;
+                    const ctx = exportCanvas.getContext('2d');
+
+                    // 1. วาดภาพโจทย์ลงไปก่อน
+                    if (backgroundImages[index]) {
+                        ctx.drawImage(backgroundImages[index], 0, 0);
+                    }
+                    // 2. วาดรอยขีดเขียนทับลงไป
+                    ctx.drawImage(drawCanvas, 0, 0);
+
+                    // โหลดลงเครื่อง
                     const link = document.createElement('a');
-                    link.download = `แบบฝึกหัด-หน้า-${index + 1}.png`;
-                    link.href = canvas.toDataURL('image/png');
+                    link.download = `แบบฝึกหัด-แก้ไขแล้ว-${index + 1}.png`;
+                    link.href = exportCanvas.toDataURL('image/png');
                     link.click();
-                }, index * 300); 
+                }, index * 400); 
             });
         }
     </script>
