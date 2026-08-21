@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>พื้นที่ทำแบบฝึกหัด (Pro Mode)</title>
+    <!-- ✨ นำเข้าไลบรารีสำหรับสร้างไฟล์ PDF (jsPDF) ✨ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
             -webkit-touch-callout: none; 
@@ -35,6 +37,7 @@
         
         .btn-back { background: #555; color: white; }
         .btn-save { background: #34C759; color: white; }
+        .btn-clear { background: #FF3B30; color: white; }
         
         #btnTheme { background: #333; color: white; }
         .btn-undo { background: #FF9500; color: white; font-size: 16px; padding: 10px 15px; } 
@@ -58,6 +61,24 @@
         .main-canvas { cursor: crosshair; }
         .draft-canvas { pointer-events: none; } 
 
+        /* ✨ หน้าต่าง Popup สำหรับเลือกประเภทไฟล์ ✨ */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background: white; padding: 25px; border-radius: 15px; width: 90%; max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center;
+        }
+        .modal-content h3 { margin-top: 0; margin-bottom: 20px; color: #333; }
+        .btn-export { display: block; width: 100%; padding: 15px; margin-bottom: 10px; font-size: 16px; font-weight: bold; border-radius: 10px; color: white; }
+        .btn-export.pdf { background: #FF3B30; }
+        .btn-export.png { background: #007AFF; }
+        .btn-export.jpg { background: #34C759; }
+        .btn-export.cancel { background: #e0e0e0; color: #333; margin-top: 15px; }
+
+        /* โหมดกลางคืน */
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         body.dark-theme .bottom-row { background: #3a3a3a; }
@@ -66,6 +87,8 @@
         body.dark-theme .tool-btn { background: #555; color: white; }
         body.dark-theme .tool-btn.active { background: #005bb5; border-color: #4da3ff; }
         body.dark-theme .canvas-wrapper { box-shadow: 0 5px 20px rgba(0,0,0,0.8); } 
+        body.dark-theme .modal-content { background: #2c2c2c; }
+        body.dark-theme .modal-content h3 { color: white; }
     </style>
 </head>
 <body>
@@ -76,7 +99,10 @@
             <button class="btn-undo" onclick="undo()">↩️ ย้อนกลับ</button>
             <button class="btn-redo" onclick="redo()">ทำซ้ำ ↪️</button>
             <button id="btnTheme" onclick="toggleTheme()">🌙 กลางคืน</button>
-            <button class="btn-save" onclick="downloadAll()">💾 เซฟรูป</button>
+            <button class="btn-clear" onclick="clearDraft()">🗑️ ล้างทำใหม่</button>
+            
+            <!-- เปลี่ยนปุ่มเซฟให้เปิดหน้าต่าง Popup แทน -->
+            <button class="btn-save" onclick="openExportModal()">💾 ส่งออก / เซฟไฟล์</button>
         </div>
         
         <div class="bottom-row" id="drawingTools">
@@ -104,39 +130,38 @@
 
     <div id="workspace"></div>
 
+    <!-- ✨ หน้าต่าง Popup สำหรับเซฟไฟล์ ✨ -->
+    <div id="exportModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>💾 เลือกประเภทไฟล์ที่ต้องการ</h3>
+            <button class="btn-export pdf" onclick="executeDownload('pdf')">📄 เซฟเป็น PDF (รวมทุกหน้าไว้ไฟล์เดียว)</button>
+            <button class="btn-export png" onclick="executeDownload('png')">🖼️ เซฟเป็น PNG (ภาพชัด / โหลดแยกหน้า)</button>
+            <button class="btn-export jpg" onclick="executeDownload('jpg')">📸 เซฟเป็น JPG (ไฟล์เล็ก / โหลดแยกหน้า)</button>
+            <button class="btn-export cancel" onclick="closeExportModal()">❌ ยกเลิก</button>
+        </div>
+    </div>
+
     <script>
         let isSafeToLeave = false; 
 
-        // 🛡️ 1. ดักการรีเฟรช และ ปิดแท็บ (สำหรับ PC)
         window.addEventListener('beforeunload', function (e) {
             if (!isSafeToLeave) {
-                e.preventDefault();
-                e.returnValue = ''; 
+                e.preventDefault(); e.returnValue = ''; 
             }
         });
 
-        // 🛡️ 2. ดักการปัดหน้าจอ (Swipe Back) ของ Safari / ปุ่ม Back ของเบราว์เซอร์
-        window.history.pushState(null, null, window.location.href); // ดันประวัติปลอมเข้าไป 1 อันทันทีที่เปิดเว็บ
-        
+        window.history.pushState(null, null, window.location.href);
         window.addEventListener('popstate', function (event) {
             if (!isSafeToLeave) {
                 if(confirm('คุณต้องการออกจากหน้านี้ใช่ไหม?\n(ข้อมูลลายมือที่ยังไม่ได้กดเซฟจะหายไปนะ)')) {
-                    isSafeToLeave = true; // อนุญาตให้ออก
-                    window.history.back(); // สั่งให้ถอยหลังไปหน้า index
+                    isSafeToLeave = true; window.history.back(); 
                 } else {
-                    // ถ้าเปลี่ยนใจ ให้ดันประวัติปลอมกลับเข้าไปล็อกไว้อีกรอบ
                     window.history.pushState(null, null, window.location.href);
                 }
             }
         });
 
-        // 🛡️ 3. ปุ่มกลับในแอปของเราเอง
-        function goBack() {
-            if(confirm('คุณต้องการออกจากหน้านี้ใช่ไหม?\n(ข้อมูลลายมือที่ยังไม่ได้กดเซฟจะหายไปนะ)')) {
-                isSafeToLeave = true; 
-                window.location.href = 'index.html';
-            }
-        }
+        function goBack() { window.location.href = 'index.html'; }
 
         const workspace = document.getElementById('workspace');
         const drawingTools = document.getElementById('drawingTools');
@@ -163,6 +188,9 @@
                     imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
                 });
                 ctx.putImageData(lastState.imageData, 0, 0);
+                
+                const storageKey = targetCanvas.getAttribute('data-storage-key');
+                localStorage.setItem(storageKey, targetCanvas.toDataURL('image/png'));
             }
         }
 
@@ -178,6 +206,9 @@
                     imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
                 });
                 ctx.putImageData(nextState.imageData, 0, 0);
+                
+                const storageKey = targetCanvas.getAttribute('data-storage-key');
+                localStorage.setItem(storageKey, targetCanvas.toDataURL('image/png'));
             }
         }
 
@@ -186,11 +217,9 @@
             document.body.classList.toggle('dark-theme', isDarkMode);
             const btn = document.getElementById('btnTheme');
             if (isDarkMode) {
-                btn.innerHTML = '☀️ กลางวัน';
-                btn.style.background = '#f39c12';
+                btn.innerHTML = '☀️ กลางวัน'; btn.style.background = '#f39c12';
             } else {
-                btn.innerHTML = '🌙 กลางคืน';
-                btn.style.background = '#333';
+                btn.innerHTML = '🌙 กลางคืน'; btn.style.background = '#333';
             }
         }
 
@@ -231,6 +260,9 @@
             canvas.id = `canvas-page-${index}`;
             canvas.className = "main-canvas";
             
+            const storageKey = "draft_" + index + "_" + encodeURIComponent(url).slice(-40);
+            canvas.setAttribute('data-storage-key', storageKey);
+            
             const draftCanvas = document.createElement('canvas');
             draftCanvas.id = `draft-canvas-${index}`;
             draftCanvas.className = "draft-canvas";
@@ -241,6 +273,25 @@
                 draftCanvas.width = img.naturalWidth;
                 draftCanvas.height = img.naturalHeight;
                 backgroundImages[index] = img; 
+                
+                const savedDraft = localStorage.getItem(storageKey);
+                if (savedDraft) {
+                    const draftImg = new Image();
+                    draftImg.onload = () => {
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(draftImg, 0, 0);
+                        globalUndoStack.push({
+                            index: index,
+                            imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
+                        });
+                    };
+                    draftImg.src = savedDraft;
+                } else {
+                    globalUndoStack.push({
+                        index: index,
+                        imageData: canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
+                    });
+                }
             };
 
             wrapper.appendChild(img);
@@ -248,78 +299,51 @@
             wrapper.appendChild(draftCanvas);
             workspace.appendChild(wrapper);
 
-            setupDrawingSystem(canvas, draftCanvas, index);
+            setupDrawingSystem(canvas, draftCanvas, index, storageKey);
         }
 
-        function setupDrawingSystem(canvas, draftCanvas, pageIndex) {
+        function setupDrawingSystem(canvas, draftCanvas, pageIndex, storageKey) {
             const ctx = canvas.getContext('2d', { willReadFrequently: true }); 
             const draftCtx = draftCanvas.getContext('2d', { willReadFrequently: true }); 
-            let isDrawing = false;
-            let lastX = 0, lastY = 0;
+            let isDrawing = false; let lastX = 0, lastY = 0;
 
             function getPos(clientX, clientY) {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
+                return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
             }
 
             function startAction(x, y) {
-                globalUndoStack.push({
-                    index: pageIndex,
-                    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
-                });
+                globalUndoStack.push({ index: pageIndex, imageData: ctx.getImageData(0, 0, canvas.width, canvas.height) });
                 if (globalUndoStack.length > 50) globalUndoStack.shift();
                 globalRedoStack = [];
 
-                isDrawing = true;
-                lastX = x; lastY = y;
+                isDrawing = true; lastX = x; lastY = y;
                 
-                if (currentTool === 'highlighter') {
-                    draftCanvas.style.opacity = currentOpacity * 0.3;
-                } else if (currentTool === 'pen') {
-                    draftCanvas.style.opacity = currentOpacity;
-                }
+                if (currentTool === 'highlighter') { draftCanvas.style.opacity = currentOpacity * 0.3; } 
+                else if (currentTool === 'pen') { draftCanvas.style.opacity = currentOpacity; }
             }
 
             function drawAction(x, y, pressure) {
                 if (!isDrawing) return;
                 
                 if (currentTool === 'eraser') {
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
+                    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.globalAlpha = 1.0; 
-                    ctx.lineWidth = currentSize * 5; 
-                    ctx.strokeStyle = "rgba(0,0,0,1)";
-                    
-                    ctx.beginPath();
-                    ctx.moveTo(lastX, lastY);
-                    ctx.lineTo(x, y);
-                    ctx.stroke();
+                    ctx.globalAlpha = 1.0; ctx.lineWidth = currentSize * 5; ctx.strokeStyle = "rgba(0,0,0,1)";
+                    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
                 } else {
-                    draftCtx.lineCap = 'round';
-                    draftCtx.lineJoin = 'round';
+                    draftCtx.lineCap = 'round'; draftCtx.lineJoin = 'round';
                     draftCtx.globalCompositeOperation = 'source-over';
                     draftCtx.globalAlpha = 1.0; 
-                    
                     if (currentTool === 'highlighter') {
-                        draftCtx.lineWidth = currentSize * 4;
-                        draftCtx.strokeStyle = currentColor;
+                        draftCtx.lineWidth = currentSize * 4; draftCtx.strokeStyle = currentColor;
                     } else {
-                        draftCtx.lineWidth = (pressure * currentSize * 2) + 1; 
-                        draftCtx.strokeStyle = currentColor;
+                        draftCtx.lineWidth = (pressure * currentSize * 2) + 1; draftCtx.strokeStyle = currentColor;
                     }
-
-                    draftCtx.beginPath();
-                    draftCtx.moveTo(lastX, lastY);
-                    draftCtx.lineTo(x, y);
-                    draftCtx.stroke();
+                    draftCtx.beginPath(); draftCtx.moveTo(lastX, lastY); draftCtx.lineTo(x, y); draftCtx.stroke();
                 }
-
                 lastX = x; lastY = y;
             }
 
@@ -327,85 +351,151 @@
                 if (isDrawing) {
                     if (currentTool !== 'eraser') {
                         ctx.globalCompositeOperation = 'source-over';
-                        if (currentTool === 'highlighter') {
-                            ctx.globalAlpha = currentOpacity * 0.3;
-                        } else {
-                            ctx.globalAlpha = currentOpacity;
-                        }
+                        ctx.globalAlpha = currentTool === 'highlighter' ? currentOpacity * 0.3 : currentOpacity;
                         ctx.drawImage(draftCanvas, 0, 0);
                         draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
                     }
                     isDrawing = false;
+                    try { localStorage.setItem(storageKey, canvas.toDataURL('image/png')); } catch(e) {}
                 }
             }
 
-            canvas.addEventListener('mousedown', (e) => {
-                const pos = getPos(e.clientX, e.clientY);
-                startAction(pos.x, pos.y);
-            });
-            canvas.addEventListener('mousemove', (e) => {
-                const pos = getPos(e.clientX, e.clientY);
-                drawAction(pos.x, pos.y, 0.5);
-            });
-            canvas.addEventListener('mouseup', stopAction);
-            canvas.addEventListener('mouseleave', stopAction);
+            canvas.addEventListener('mousedown', (e) => { const pos = getPos(e.clientX, e.clientY); startAction(pos.x, pos.y); });
+            canvas.addEventListener('mousemove', (e) => { const pos = getPos(e.clientX, e.clientY); drawAction(pos.x, pos.y, 0.5); });
+            canvas.addEventListener('mouseup', stopAction); canvas.addEventListener('mouseleave', stopAction);
 
             canvas.addEventListener('touchstart', (e) => {
                 if (e.touches && e.touches[0].touchType === 'stylus') {
-                    e.preventDefault(); 
-                    const pos = getPos(e.touches[0].clientX, e.touches[0].clientY);
-                    startAction(pos.x, pos.y);
+                    e.preventDefault(); const pos = getPos(e.touches[0].clientX, e.touches[0].clientY); startAction(pos.x, pos.y);
                 }
             }, { passive: false });
 
             canvas.addEventListener('touchmove', (e) => {
                 if (e.touches && e.touches[0].touchType === 'stylus') {
-                    e.preventDefault(); 
-                    const pos = getPos(e.touches[0].clientX, e.touches[0].clientY);
+                    e.preventDefault(); const pos = getPos(e.touches[0].clientX, e.touches[0].clientY);
                     let pressure = e.touches[0].force !== undefined ? e.touches[0].force : 0.5;
-                    if (pressure === 0) pressure = 0.5; 
-                    drawAction(pos.x, pos.y, pressure);
+                    if (pressure === 0) pressure = 0.5; drawAction(pos.x, pos.y, pressure);
                 }
             }, { passive: false });
 
-            canvas.addEventListener('touchend', stopAction);
-            canvas.addEventListener('touchcancel', stopAction);
+            canvas.addEventListener('touchend', stopAction); canvas.addEventListener('touchcancel', stopAction);
+        }
+
+        function clearDraft() {
+            if(confirm('ต้องการลบลายมือทั้งหมด เพื่อเริ่มทำใหม่ใช่หรือไม่?')) {
+                const canvases = document.querySelectorAll('.main-canvas');
+                canvases.forEach((canvas) => {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                    localStorage.removeItem(canvas.getAttribute('data-storage-key')); 
+                });
+                globalUndoStack = []; globalRedoStack = [];
+            }
         }
 
         // ==========================================
-        // 💾 ระบบเซฟรูป
+        // 💾 ระบบ Popup และ เซฟเป็น PDF / PNG / JPG
         // ==========================================
-        function downloadAll() {
-            // อนุญาตให้ออกชั่วคราว เพื่อไม่ให้เด้งถามกวนใจตอนโหลดไฟล์
-            isSafeToLeave = true; 
+        const modal = document.getElementById('exportModal');
+        
+        function openExportModal() {
+            modal.style.display = 'flex';
+        }
+
+        function closeExportModal() {
+            modal.style.display = 'none';
+        }
+
+        async function executeDownload(format) {
+            closeExportModal(); // ปิดหน้าต่าง Popup
+            isSafeToLeave = true; // อนุญาตให้ออกชั่วคราว ไม่ให้เด้งแจ้งเตือนตอนโหลด
 
             const canvases = document.querySelectorAll('.main-canvas');
             if (canvases.length === 0) return;
 
-            canvases.forEach((drawCanvas, index) => {
+            // 📄 กรณีเลือก PDF (รวมทุกหน้าเป็นไฟล์เดียว)
+            if (format === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                let pdf;
+                
+                // แจ้งเตือนผู้ใช้ว่ากำลังประมวลผล
+                const btnSave = document.querySelector('.btn-save');
+                const originalText = btnSave.innerHTML;
+                btnSave.innerHTML = "⏳ กำลังสร้างไฟล์ PDF...";
+                
+                // ใช้ setTimeout เพื่อให้เบราว์เซอร์อัปเดตข้อความปุ่มก่อนรันงานหนัก
                 setTimeout(() => {
-                    const exportCanvas = document.createElement('canvas');
-                    exportCanvas.width = drawCanvas.width;
-                    exportCanvas.height = drawCanvas.height;
-                    const ctx = exportCanvas.getContext('2d');
+                    for (let i = 0; i < canvases.length; i++) {
+                        const drawCanvas = canvases[i];
+                        const exportCanvas = document.createElement('canvas');
+                        exportCanvas.width = drawCanvas.width;
+                        exportCanvas.height = drawCanvas.height;
+                        const ctx = exportCanvas.getContext('2d');
 
-                    if (backgroundImages[index]) {
-                        ctx.drawImage(backgroundImages[index], 0, 0);
+                        // เทสีขาวเป็นพื้นหลัง (ป้องกันพื้นใสกลายเป็นสีดำใน PDF)
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+                        if (backgroundImages[i]) ctx.drawImage(backgroundImages[i], 0, 0);
+                        ctx.drawImage(drawCanvas, 0, 0);
+
+                        // ดึงภาพเป็น JPG เพื่อไม่ให้ไฟล์ PDF ใหญ่เกินไป
+                        const imgData = exportCanvas.toDataURL('image/jpeg', 0.9);
+                        
+                        // ถ้านี่คือหน้าแรก ให้สร้างเอกสาร PDF ขึ้นมา
+                        if (i === 0) {
+                            const orientation = exportCanvas.width > exportCanvas.height ? 'l' : 'p';
+                            pdf = new jsPDF({
+                                orientation: orientation,
+                                unit: 'px',
+                                format: [exportCanvas.width, exportCanvas.height]
+                            });
+                        } else {
+                            // หน้าถัดๆ ไป ให้กดเพิ่มหน้ากระดาษ
+                            const orientation = exportCanvas.width > exportCanvas.height ? 'l' : 'p';
+                            pdf.addPage([exportCanvas.width, exportCanvas.height], orientation);
+                        }
+                        
+                        pdf.addImage(imgData, 'JPEG', 0, 0, exportCanvas.width, exportCanvas.height);
                     }
                     
-                    ctx.drawImage(drawCanvas, 0, 0);
+                    pdf.save('แบบฝึกหัด-ส่งงาน.pdf'); // โหลดไฟล์ลงเครื่อง
+                    
+                    btnSave.innerHTML = originalText;
+                    isSafeToLeave = false;
+                }, 100);
 
-                    const link = document.createElement('a');
-                    link.download = `แบบฝึกหัด-แก้ไขแล้ว-${index + 1}.png`;
-                    link.href = exportCanvas.toDataURL('image/png');
-                    link.click();
-                }, index * 400); 
-            });
+            } 
+            // 🖼️ กรณีเลือก PNG หรือ JPG (โหลดแยกเป็นแผ่นๆ)
+            else {
+                canvases.forEach((drawCanvas, index) => {
+                    setTimeout(() => {
+                        const exportCanvas = document.createElement('canvas');
+                        exportCanvas.width = drawCanvas.width;
+                        exportCanvas.height = drawCanvas.height;
+                        const ctx = exportCanvas.getContext('2d');
 
-            // รอโหลดเสร็จ แล้วค่อยล็อกหน้าจอต่อ เผื่อผู้ใช้จะวาดต่อ
-            setTimeout(() => {
-                isSafeToLeave = false;
-            }, canvases.length * 400 + 500);
+                        // ถ้าเป็น JPG ต้องเทพื้นขาวก่อน
+                        if (format === 'jpg') {
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+                        }
+
+                        if (backgroundImages[index]) ctx.drawImage(backgroundImages[index], 0, 0);
+                        ctx.drawImage(drawCanvas, 0, 0);
+
+                        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+                        const fileExt = format;
+
+                        const link = document.createElement('a');
+                        link.download = `แบบฝึกหัด-หน้าที่${index + 1}.${fileExt}`;
+                        link.href = exportCanvas.toDataURL(mimeType, 0.9);
+                        link.click();
+                    }, index * 400); 
+                });
+
+                setTimeout(() => { isSafeToLeave = false; }, canvases.length * 400 + 500);
+            }
         }
     </script>
 </body>
