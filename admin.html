@@ -19,6 +19,14 @@
             border: 2px solid #ddd; border-radius: 8px; font-size: 16px;
         }
         
+        /* สไตล์ช่องค้นหาหน้าแอดมิน */
+        .search-box {
+            width: 100%; padding: 12px; margin-bottom: 15px; 
+            border: 2px solid #007AFF; border-radius: 8px; font-size: 16px;
+            box-sizing: border-box; outline: none;
+        }
+        .search-box:focus { box-shadow: 0 0 8px rgba(0, 122, 255, 0.3); }
+
         button { 
             padding: 12px 25px; font-size: 16px; font-weight: bold;
             background: #007AFF; color: white; border: none; border-radius: 8px; 
@@ -37,8 +45,7 @@
         .success { color: #34C759; }
         .error { color: #FF3B30; }
 
-        /* สไตล์รายการแบบฝึกหัด */
-        .list-container { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; text-align: left; }
+        .list-container { display: flex; flex-direction: column; gap: 15px; margin-top: 10px; text-align: left; }
         .list-item { 
             display: flex; justify-content: space-between; align-items: center; 
             background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd;
@@ -50,7 +57,6 @@
 </head>
 <body>
 
-    <!-- ปุ่มกลับหน้าแรก -->
     <div style="max-width: 600px; margin: 0 auto 20px auto; text-align: left;">
         <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับหน้าหลัก</button>
     </div>
@@ -67,23 +73,21 @@
         <div id="status"></div>
     </div>
 
-    <!-- ส่วนที่ 2: จัดการข้อมูล (ลบ) -->
+    <!-- ส่วนที่ 2: จัดการข้อมูล (ลบ + ค้นหา) -->
     <div class="box">
         <h3>🗑️ จัดการแบบฝึกหัดที่มีอยู่</h3>
         <p style="color: #666; font-size: 14px; margin-bottom: 20px;">รายการทั้งหมดในระบบ (ลบแล้วข้อมูลจะหายไปจากหน้าแรกทันที)</p>
         
+        <!-- ✨ เพิ่มช่องพิมพ์ค้นหา (Filter) ✨ -->
+        <input type="text" id="adminSearchInput" class="search-box" placeholder="🔍 พิมพ์ชื่อแบบฝึกหัดเพื่อกรองหา...">
+
         <div id="adminGallery" class="list-container">
-            <div class="loading" style="text-align: center;">กำลังโหลดข้อมูล...</div>
+            <div class="loading" style="text-align: center;">⏳ กำลังโหลดข้อมูล...</div>
         </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- 🔥 โค้ด Firebase ระบบหลังบ้าน -->
-    <!-- ========================================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        
-        // เพิ่มคำสั่ง doc และ deleteDoc สำหรับระบบลบ
         import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, deleteDoc } 
         from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -100,67 +104,38 @@
         const db = getFirestore(app);
         const IMGBB_API_KEY = 'e0fa69420791826c629b428735db5af8';
 
-        // ==========================================
-        // 1. ระบบดึงข้อมูลมาแสดงเพื่อลบ
-        // ==========================================
         const adminGallery = document.getElementById('adminGallery');
+        const adminSearchInput = document.getElementById('adminSearchInput');
+        
+        // ตัวแปรเก็บข้อมูลทั้งหมด เพื่อใช้กรองโดยไม่ต้องโหลดใหม่
+        let allAdminItems = []; 
 
+        // ==========================================
+        // 1. ระบบโหลดและแสดงข้อมูล
+        // ==========================================
         async function loadAdminGallery() {
             adminGallery.innerHTML = '<div class="loading" style="text-align: center;">⏳ กำลังโหลดข้อมูล...</div>';
             try {
                 const q = query(collection(db, "workbooks"), orderBy("createdAt", "desc"));
                 const querySnapshot = await getDocs(q);
                 
-                adminGallery.innerHTML = ''; // ล้างข้อความโหลด
+                allAdminItems = []; // เคลียร์ของเก่าก่อน
                 
                 if(querySnapshot.empty) {
-                    adminGallery.innerHTML = "<p style='text-align: center;'>ยังไม่มีแบบฝึกหัดในระบบ</p>";
+                    adminGallery.innerHTML = "<p style='text-align: center; color: #888;'>ยังไม่มีแบบฝึกหัดในระบบ</p>";
                     return;
                 }
 
+                // เก็บข้อมูลลง Array
                 querySnapshot.forEach((documentSnapshot) => {
-                    const data = documentSnapshot.data();
-                    const docId = documentSnapshot.id; // รหัสอ้างอิงสำหรับใช้ลบ
-
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'list-item';
-                    
-                    itemDiv.innerHTML = `
-                        <div class="list-info">
-                            <img src="${data.url}" alt="${data.name}">
-                            <span class="list-name">${data.name}</span>
-                        </div>
-                    `;
-
-                    // ปุ่มลบ
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'btn-delete';
-                    deleteBtn.innerHTML = "🗑️ ลบ";
-                    
-                    // ✨ ระบบแจ้งเตือนยืนยันก่อนลบ ✨
-                    deleteBtn.onclick = async () => {
-                        const confirmDelete = confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบแบบฝึกหัด: "${data.name}" ?\n\n(หากลบแล้วจะไม่สามารถกู้คืนได้)`);
-                        
-                        if (confirmDelete) {
-                            deleteBtn.innerHTML = "⏳ กำลังลบ...";
-                            deleteBtn.disabled = true;
-                            try {
-                                // สั่งลบข้อมูลจากฐานข้อมูล Firestore
-                                await deleteDoc(doc(db, "workbooks", docId));
-                                // ลบเสร็จให้รีเฟรชรายการใหม่ทันที
-                                loadAdminGallery(); 
-                            } catch (error) {
-                                console.error(error);
-                                alert("❌ เกิดข้อผิดพลาดในการลบ กรุณาลองใหม่");
-                                deleteBtn.innerHTML = "🗑️ ลบ";
-                                deleteBtn.disabled = false;
-                            }
-                        }
-                    };
-
-                    itemDiv.appendChild(deleteBtn);
-                    adminGallery.appendChild(itemDiv);
+                    allAdminItems.push({
+                        id: documentSnapshot.id,
+                        ...documentSnapshot.data()
+                    });
                 });
+
+                // นำไปแสดงผล
+                renderAdminList(allAdminItems);
 
             } catch (error) {
                 console.error(error);
@@ -168,12 +143,64 @@
             }
         }
 
+        // ฟังก์ชันสร้างรายชื่อเพื่อแสดงผล (รองรับการกรอง)
+        function renderAdminList(itemsToRender) {
+            adminGallery.innerHTML = ''; 
+            
+            if (itemsToRender.length === 0) {
+                adminGallery.innerHTML = "<p style='text-align: center; color: #888;'>ไม่พบแบบฝึกหัดที่ค้นหา</p>";
+                return;
+            }
+
+            itemsToRender.forEach((data) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'list-item';
+                
+                itemDiv.innerHTML = `
+                    <div class="list-info">
+                        <img src="${data.url}" alt="${data.name}">
+                        <span class="list-name">${data.name}</span>
+                    </div>
+                `;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn-delete';
+                deleteBtn.innerHTML = "🗑️ ลบ";
+                
+                deleteBtn.onclick = async () => {
+                    const confirmDelete = confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบแบบฝึกหัด: "${data.name}" ?\n\n(หากลบแล้วจะไม่สามารถกู้คืนได้)`);
+                    if (confirmDelete) {
+                        deleteBtn.innerHTML = "⏳ กำลังลบ...";
+                        deleteBtn.disabled = true;
+                        try {
+                            await deleteDoc(doc(db, "workbooks", data.id));
+                            loadAdminGallery(); // รีเฟรชข้อมูลใหม่
+                            adminSearchInput.value = ''; // ล้างช่องค้นหา
+                        } catch (error) {
+                            alert("❌ เกิดข้อผิดพลาดในการลบ กรุณาลองใหม่");
+                            deleteBtn.innerHTML = "🗑️ ลบ";
+                            deleteBtn.disabled = false;
+                        }
+                    }
+                };
+
+                itemDiv.appendChild(deleteBtn);
+                adminGallery.appendChild(itemDiv);
+            });
+        }
+
+        // ✨ ระบบกรองข้อมูลเมื่อพิมพ์ (Real-time Filter) ✨
+        adminSearchInput.addEventListener('input', (e) => {
+            const searchText = e.target.value.toLowerCase();
+            const filteredData = allAdminItems.filter(item => item.name.toLowerCase().includes(searchText));
+            renderAdminList(filteredData);
+        });
+
         // โหลดรายการทันทีเมื่อเปิดหน้าเว็บ
         loadAdminGallery();
 
-
         // ==========================================
-        // 2. ระบบอัปโหลด (ของเดิม)
+        // 2. ระบบอัปโหลด
         // ==========================================
         document.getElementById('uploadBtn').addEventListener('click', async () => {
             const fileName = document.getElementById('fileName').value;
@@ -191,7 +218,6 @@
             btn.disabled = true;
 
             try {
-                // อัปโหลดขึ้น ImgBB
                 const formData = new FormData();
                 formData.append('image', fileInput);
                 const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
@@ -203,7 +229,6 @@
                 if (!imgbbData.success) throw new Error("อัปโหลดรูปไม่สำเร็จ");
                 const imageUrl = imgbbData.data.url; 
 
-                // บันทึกลง Firebase
                 statusDiv.innerHTML = "⏳ กำลังบันทึกลงฐานข้อมูล Firebase...";
                 await addDoc(collection(db, "workbooks"), {
                     name: fileName,
@@ -214,20 +239,18 @@
                 statusDiv.innerHTML = "✅ อัปโหลดสำเร็จเรียบร้อย!";
                 statusDiv.className = "success";
                 
-                // ล้างค่าช่องกรอก
                 document.getElementById('fileName').value = '';
                 document.getElementById('fileInput').value = '';
+                adminSearchInput.value = ''; // ล้างช่องค้นหาเผื่อค้างไว้
 
-                // โหลดรายการใหม่ทันที เพื่อให้รูปที่เพิ่งอัปโหลดโผล่ขึ้นมาด้านล่างด้วย
-                loadAdminGallery();
+                loadAdminGallery(); // รีเฟรชรายการหลังอัปโหลด
 
             } catch (error) {
-                console.error(error);
                 statusDiv.innerHTML = "❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
                 statusDiv.className = "error";
             } finally {
                 btn.disabled = false;
-                setTimeout(() => { statusDiv.innerHTML = ""; }, 5000); // ซ่อนข้อความแจ้งเตือนหลัง 5 วินาที
+                setTimeout(() => { statusDiv.innerHTML = ""; }, 5000);
             }
         });
     </script>
