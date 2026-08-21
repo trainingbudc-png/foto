@@ -38,6 +38,7 @@
         .btn-save { background: #34C759; color: white; }
         #btnToggleMode { background: #007AFF; color: white; font-size: 16px; padding: 10px 25px;}
         #btnTheme { background: #333; color: white; }
+        .btn-undo { background: #FF9500; color: white; font-size: 16px; padding: 10px 20px; } /* ปุ่ม Undo */
         
         .tool-btn { background: #e0e0e0; color: #333; border: 2px solid transparent; transition: all 0.2s; }
         .tool-btn.active { border: 2px solid #007AFF; background: #d1e7dd; }
@@ -51,14 +52,14 @@
         #workspace { width: 100%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
         
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
-        .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; transition: filter 0.3s;}
+        .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
         .mode-draw canvas { touch-action: none; cursor: crosshair; pointer-events: auto; }
         .mode-scroll canvas { touch-action: auto; pointer-events: none; }
 
         /* ========================================= */
-        /* 🌙 ธีมกลางคืน (Dark Mode Styles) */
+        /* 🌙 ธีมกลางคืน (ปรับให้มืดแค่ UI พื้นหลัง ไม่โดนกระดาษ) */
         /* ========================================= */
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
@@ -67,22 +68,21 @@
         body.dark-theme .divider { border-left-color: #555; }
         body.dark-theme .tool-btn { background: #555; color: white; }
         body.dark-theme .tool-btn.active { background: #005bb5; border-color: #4da3ff; }
-        body.dark-theme .canvas-wrapper { background: #000; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
-        /* กลับสีรูปโจทย์ (ขาวเป็นดำ) แต่รักษาสีเดิมของรูปไว้ด้วย hue-rotate */
-        body.dark-theme .bg-img { filter: invert(1) hue-rotate(180deg); }
+        body.dark-theme .canvas-wrapper { box-shadow: 0 5px 20px rgba(0,0,0,0.8); } 
     </style>
 </head>
 <body>
 
     <div class="header-tools">
-        <!-- แถวบน: สลับโหมด / เซฟ -->
+        <!-- แถวบน: สลับโหมด / เซฟ / Undo -->
         <div class="top-row">
             <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
-            <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาดเขียน</button>
+            <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาด</button>
             
-            <!-- ✨ ปุ่มใหม่: สลับกลางวัน/กลางคืน ✨ -->
-            <button id="btnTheme" onclick="toggleTheme()">🌙 โหมดกลางคืน</button>
+            <!-- ✨ ปุ่ม Undo แบบ GoodNotes ✨ -->
+            <button class="btn-undo" onclick="undo()">↩️ ย้อนกลับ</button>
             
+            <button id="btnTheme" onclick="toggleTheme()">🌙 กลางคืน</button>
             <button class="btn-save" onclick="downloadAll()">💾 เซฟรูป</button>
         </div>
         
@@ -126,50 +126,54 @@
         let backgroundImages = []; 
 
         // ==========================================
-        // ระบบสลับกลางวัน / กลางคืน
+        // 🌟 ระบบ UNDO (ย้อนกลับการกระทำ)
+        // ==========================================
+        let globalUndoStack = []; // ตัวแปรเก็บประวัติการวาดทั้งหมด
+
+        function undo() {
+            if (globalUndoStack.length === 0) return; // ถ้าไม่มีอะไรให้ย้อนกลับก็ไม่ต้องทำอะไร
+            
+            // ดึงข้อมูลภาพล่าสุดออกมา
+            const lastState = globalUndoStack.pop();
+            const targetCanvas = document.getElementById(`canvas-page-${lastState.index}`);
+            
+            if (targetCanvas) {
+                const ctx = targetCanvas.getContext('2d');
+                // เอาภาพเก่าก่อนวาดเส้นล่าสุด มาแปะทับลงไป (ลบเส้นล่าสุดทิ้ง)
+                ctx.putImageData(lastState.imageData, 0, 0);
+            }
+        }
+
+        // ==========================================
+        // ระบบสลับกลางวัน / กลางคืน (แก้ให้กระดาษคงเดิมแล้ว!)
         // ==========================================
         function toggleTheme() {
             isDarkMode = !isDarkMode;
             document.body.classList.toggle('dark-theme', isDarkMode);
             
             const btn = document.getElementById('btnTheme');
-            const colorPicker = document.getElementById('colorPicker');
-
             if (isDarkMode) {
-                btn.innerHTML = '☀️ โหมดกลางวัน';
+                btn.innerHTML = '☀️ กลางวัน';
                 btn.style.background = '#f39c12';
-                // ถ้าสลับเป็นจอดำ แล้วปากกายังเป็นสีดำอยู่ ให้เปลี่ยนปากกาเป็นสีขาวอัตโนมัติ
-                if (currentColor === '#000000') {
-                    currentColor = '#ffffff';
-                    colorPicker.value = '#ffffff';
-                }
             } else {
-                btn.innerHTML = '🌙 โหมดกลางคืน';
+                btn.innerHTML = '🌙 กลางคืน';
                 btn.style.background = '#333';
-                // ถ้าสลับกลับเป็นจอขาว แล้วปากกาเป็นสีขาวอยู่ ให้เปลี่ยนปากกาเป็นสีดำอัตโนมัติ
-                if (currentColor === '#ffffff') {
-                    currentColor = '#000000';
-                    colorPicker.value = '#000000';
-                }
             }
         }
 
-        // ==========================================
-        // ระบบสลับโหมดวาด / เลื่อนหน้าจอ
-        // ==========================================
         function toggleMode() {
             const btn = document.getElementById('btnToggleMode');
             if (currentMode === 'draw') {
                 currentMode = 'scroll';
                 workspace.className = 'mode-scroll'; 
-                btn.innerHTML = '👆 โหมดเลื่อนหน้าจอ';
+                btn.innerHTML = '👆 โหมดเลื่อน';
                 btn.style.background = '#FF9500'; 
                 drawingTools.style.opacity = '0.4'; 
                 drawingTools.style.pointerEvents = 'none';
             } else {
                 currentMode = 'draw';
                 workspace.className = 'mode-draw';
-                btn.innerHTML = '✍️ โหมดวาดเขียน';
+                btn.innerHTML = '✍️ โหมดวาด';
                 btn.style.background = '#007AFF'; 
                 drawingTools.style.opacity = '1';
                 drawingTools.style.pointerEvents = 'auto';
@@ -222,11 +226,12 @@
             wrapper.appendChild(canvas);
             workspace.appendChild(wrapper);
 
-            setupDrawingSystem(canvas);
+            setupDrawingSystem(canvas, index);
         }
 
-        function setupDrawingSystem(canvas) {
-            const ctx = canvas.getContext('2d');
+        function setupDrawingSystem(canvas, pageIndex) {
+            // willReadFrequently ช่วยให้ระบบประมวลผลการเก็บ Undo ได้ลื่นไหลขึ้น
+            const ctx = canvas.getContext('2d', { willReadFrequently: true }); 
             let isDrawing = false;
             let lastX = 0, lastY = 0;
 
@@ -241,6 +246,15 @@
             }
 
             canvas.addEventListener('pointerdown', (e) => {
+                // 💥 ทันทีที่ปากกาแตะจอ ให้เซฟรูปรอยวาดเก่าเก็บไว้ในประวัติ Undo ก่อน
+                globalUndoStack.push({
+                    index: pageIndex,
+                    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
+                });
+                
+                // จำกัดให้จำประวัติแค่ 50 ครั้งล่าสุด (กันเครื่องหน่วง)
+                if (globalUndoStack.length > 50) globalUndoStack.shift();
+
                 isDrawing = true;
                 const pos = getPos(e);
                 lastX = pos.x;
@@ -289,7 +303,7 @@
         }
 
         // ==========================================
-        // ระบบเซฟรูปภาพ (ดักโหมดกลางคืนไว้ให้แล้ว)
+        // ระบบเซฟรูปภาพ
         // ==========================================
         function downloadAll() {
             const canvases = document.querySelectorAll('canvas');
@@ -302,19 +316,10 @@
                     exportCanvas.height = drawCanvas.height;
                     const ctx = exportCanvas.getContext('2d');
 
-                    // ถ้าเปิดโหมดกลางคืนอยู่ ให้กลับสีพื้นหลังตอนเซฟด้วย จะได้รูปพื้นดำ
-                    if (isDarkMode) {
-                        ctx.filter = 'invert(1) hue-rotate(180deg)';
-                    } else {
-                        ctx.filter = 'none';
-                    }
-
                     if (backgroundImages[index]) {
                         ctx.drawImage(backgroundImages[index], 0, 0);
                     }
                     
-                    // ปิด Filter ก่อนวาดลายมือทับลงไป เพื่อให้สีปากกาคงเดิม
-                    ctx.filter = 'none';
                     ctx.drawImage(drawCanvas, 0, 0);
 
                     const link = document.createElement('a');
