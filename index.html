@@ -6,40 +6,13 @@
     <title>เลือกแบบฝึกหัด</title>
     <style>
         body { font-family: sans-serif; background-color: #f4f4f4; text-align: center; margin: 0; padding: 20px; position: relative; }
-        
-        /* สไตล์ปุ่มแอดมิน มุมขวาบน */
-        .btn-admin {
-            position: absolute; 
-            top: 15px; 
-            right: 15px;
-            background-color: #333; 
-            color: white; 
-            border: none;
-            padding: 10px 15px; 
-            border-radius: 8px; 
-            font-size: 14px;
-            font-weight: bold; 
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: 0.2s;
-        }
+        .btn-admin { position: absolute; top: 15px; right: 15px; background-color: #333; color: white; border: none; padding: 10px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; }
         .btn-admin:hover { background-color: #000; transform: scale(1.05); }
-
         .search-box { margin-bottom: 20px; margin-top: 40px; }
-        .search-box input { 
-            padding: 12px; width: 80%; max-width: 400px; 
-            font-size: 16px; border: 2px solid #ccc; border-radius: 8px; 
-        }
-        
+        .search-box input { padding: 12px; width: 80%; max-width: 400px; font-size: 16px; border: 2px solid #ccc; border-radius: 8px; }
         .gallery { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; }
-        .gallery-item { 
-            text-align: center; background: white; padding: 15px; 
-            border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        }
-        .gallery-item img { 
-            width: 150px; height: 150px; object-fit: cover; 
-            cursor: pointer; border: 3px solid #ddd; border-radius: 8px; transition: 0.2s;
-        }
+        .gallery-item { text-align: center; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .gallery-item img { width: 150px; height: 150px; object-fit: cover; cursor: pointer; border: 3px solid #ddd; border-radius: 8px; transition: 0.2s; }
         .gallery-item img:hover { border-color: #007AFF; transform: scale(1.05); }
         .gallery-item p { margin-top: 10px; font-size: 15px; color: #333; font-weight: bold; margin-bottom: 0;}
         .loader { color: #888; font-size: 18px; margin-top: 20px; font-weight: bold; }
@@ -47,9 +20,7 @@
 </head>
 <body>
 
-    <!-- ✨ ปุ่มแอดมิน มุมขวาบน ✨ -->
     <button class="btn-admin" onclick="checkAdmin()">🔒 จัดการแบบฝึกหัด</button>
-
     <h2>🔍 ค้นหาและเลือกแบบฝึกหัด</h2>
     
     <div class="search-box">
@@ -60,14 +31,9 @@
         <div class="loader" id="loader">⏳ กำลังโหลดข้อมูลแบบฝึกหัด...</div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- 🔑 สคริปต์ตรวจรหัสผ่าน -->
-    <!-- ========================================== -->
     <script>
         function checkAdmin() {
             const pass = prompt("กรุณาใส่รหัสผ่านสำหรับคุณครู:");
-            
-            // 💡 เปลี่ยนรหัสผ่านตรงตัวเลข "1234" ในบรรทัดข้างล่างนี้ได้เลยครับ!
             if (pass === "1234") { 
                 window.location.href = "admin.html";
             } else if (pass !== null && pass !== "") {
@@ -76,9 +42,6 @@
         }
     </script>
 
-    <!-- ========================================== -->
-    <!-- 🔥 เรียกใช้ Firebase (ดึงรูปมาโชว์) -->
-    <!-- ========================================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -115,8 +78,7 @@
                 renderGallery(allImages);
 
             } catch (error) {
-                console.error("Error fetching documents: ", error);
-                galleryDiv.innerHTML = "<p>❌ ไม่สามารถโหลดรูปภาพได้ กรุณาลองใหม่</p>";
+                galleryDiv.innerHTML = "<p>❌ ไม่สามารถโหลดรูปภาพได้</p>";
             }
         }
 
@@ -131,9 +93,14 @@
                 const div = document.createElement('div');
                 div.className = 'gallery-item';
                 
+                // ✨ ปรับแก้: ถ้าเป็น PDF หลายหน้า ให้ดึงเฉพาะหน้าแรกมาโชว์เป็นหน้าปก
+                const coverImage = item.url.split('|')[0];
+                
                 const img = document.createElement('img');
-                img.src = item.url;
+                img.src = coverImage;
                 img.alt = item.name;
+                
+                // แต่ตอนกดเข้าไปทำแบบฝึกหัด ให้ส่งลิงก์ไปทุกหน้าเหมือนเดิม!
                 img.onclick = () => {
                     window.location.href = `edit.html?img=${encodeURIComponent(item.url)}`;
                 };
@@ -147,14 +114,12 @@
             });
         }
 
-        // ระบบค้นหา
         document.getElementById('searchInput').addEventListener('keyup', (e) => {
             const searchText = e.target.value.toLowerCase();
             const filtered = allImages.filter(item => item.name.toLowerCase().includes(searchText));
             renderGallery(filtered);
         });
 
-        // เริ่มโหลดข้อมูล
         fetchImagesFromFirestore();
     </script>
 </body>
