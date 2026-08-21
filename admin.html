@@ -143,7 +143,7 @@
         </div>
     </div>
 
-    <!-- โค้ด JavaScript เดิมของคุณครู นำมาใส่ครบ 100% -->
+    <!-- โค้ด JavaScript -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, deleteDoc } 
@@ -224,7 +224,8 @@
                             await deleteDoc(doc(db, "workbooks", data.id));
                             loadAdminGallery(); adminSearchInput.value = ''; 
                         } catch (error) {
-                            alert("เกิดข้อผิดพลาดในการลบ"); deleteBtn.disabled = false;
+                            alert("เกิดข้อผิดพลาดในการลบ: " + error.message); 
+                            deleteBtn.disabled = false;
                         }
                     }
                 };
@@ -278,7 +279,7 @@
                         });
                         const imgbbData = await imgbbRes.json();
                         
-                        if (!imgbbData.success) throw new Error(`อัปโหลดหน้า ${i} ไม่สำเร็จ`);
+                        if (!imgbbData.success) throw new Error(`ImgBB Error (หน้า ${i}): ${imgbbData.error?.message || 'อัปโหลดไม่สำเร็จ'}`);
                         uploadedUrls.push(imgbbData.data.url);
                     }
                     finalImageUrl = uploadedUrls.join('|'); 
@@ -291,7 +292,7 @@
                         method: 'POST', body: formData
                     });
                     const imgbbData = await imgbbRes.json();
-                    if (!imgbbData.success) throw new Error("อัปโหลดรูปไม่สำเร็จ");
+                    if (!imgbbData.success) throw new Error(`ImgBB Error: ${imgbbData.error?.message || 'อัปโหลดรูปไม่สำเร็จ'}`);
                     finalImageUrl = imgbbData.data.url; 
                 }
 
@@ -313,12 +314,17 @@
                 loadAdminGallery(); 
 
             } catch (error) {
-                statusDiv.innerHTML = "❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+                console.error("Upload Error:", error);
+                // ✨ เปลี่ยนตรงนี้เพื่อให้ระบบฟ้องว่า Error จากอะไร ✨
+                statusDiv.innerHTML = "❌ ข้อผิดพลาด: " + error.message;
                 statusDiv.className = "error";
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = "อัปโหลดเข้าสู่ระบบ";
-                setTimeout(() => { statusDiv.innerHTML = ""; }, 5000);
+                // ลบการซ่อนข้อความ Error อัตโนมัติ เพื่อให้เรามีเวลาอ่าน
+                if(statusDiv.className === "success") {
+                    setTimeout(() => { statusDiv.innerHTML = ""; }, 5000);
+                }
             }
         });
     </script>
