@@ -72,7 +72,6 @@
 
     <div class="header-tools">
         <div class="top-row">
-            <!-- 🛡️ เปลี่ยนฟังก์ชันปุ่มกลับ ให้คอยถามก่อนออก -->
             <button class="btn-back" onclick="goBack()">⬅️ กลับ</button>
             <button class="btn-undo" onclick="undo()">↩️ ย้อนกลับ</button>
             <button class="btn-redo" onclick="redo()">ทำซ้ำ ↪️</button>
@@ -106,19 +105,32 @@
     <div id="workspace"></div>
 
     <script>
-        // ==========================================
-        // 🛡️ ระบบป้องกันการเผลอปิดแท็บ หรือ ปิดหน้าเว็บ
-        // ==========================================
         let isSafeToLeave = false; 
 
+        // 🛡️ 1. ดักการรีเฟรช และ ปิดแท็บ (สำหรับ PC)
         window.addEventListener('beforeunload', function (e) {
             if (!isSafeToLeave) {
                 e.preventDefault();
-                e.returnValue = ''; // บังคับให้เบราว์เซอร์โชว์แจ้งเตือน
+                e.returnValue = ''; 
             }
         });
 
-        // 🛡️ ฟังก์ชันเมื่อกดปุ่ม "กลับ" ในแอป
+        // 🛡️ 2. ดักการปัดหน้าจอ (Swipe Back) ของ Safari / ปุ่ม Back ของเบราว์เซอร์
+        window.history.pushState(null, null, window.location.href); // ดันประวัติปลอมเข้าไป 1 อันทันทีที่เปิดเว็บ
+        
+        window.addEventListener('popstate', function (event) {
+            if (!isSafeToLeave) {
+                if(confirm('คุณต้องการออกจากหน้านี้ใช่ไหม?\n(ข้อมูลลายมือที่ยังไม่ได้กดเซฟจะหายไปนะ)')) {
+                    isSafeToLeave = true; // อนุญาตให้ออก
+                    window.history.back(); // สั่งให้ถอยหลังไปหน้า index
+                } else {
+                    // ถ้าเปลี่ยนใจ ให้ดันประวัติปลอมกลับเข้าไปล็อกไว้อีกรอบ
+                    window.history.pushState(null, null, window.location.href);
+                }
+            }
+        });
+
+        // 🛡️ 3. ปุ่มกลับในแอปของเราเอง
         function goBack() {
             if(confirm('คุณต้องการออกจากหน้านี้ใช่ไหม?\n(ข้อมูลลายมือที่ยังไม่ได้กดเซฟจะหายไปนะ)')) {
                 isSafeToLeave = true; 
@@ -364,7 +376,7 @@
         // 💾 ระบบเซฟรูป
         // ==========================================
         function downloadAll() {
-            // อนุญาตให้ดาวน์โหลดได้โดยไม่ให้เด้งถามกวนใจ
+            // อนุญาตให้ออกชั่วคราว เพื่อไม่ให้เด้งถามกวนใจตอนโหลดไฟล์
             isSafeToLeave = true; 
 
             const canvases = document.querySelectorAll('.main-canvas');
@@ -390,7 +402,7 @@
                 }, index * 400); 
             });
 
-            // รอโหลดเสร็จ แล้วค่อยเปิดระบบป้องกันต่อ (เผื่อวาดต่อ)
+            // รอโหลดเสร็จ แล้วค่อยล็อกหน้าจอต่อ เผื่อผู้ใช้จะวาดต่อ
             setTimeout(() => {
                 isSafeToLeave = false;
             }, canvases.length * 400 + 500);
