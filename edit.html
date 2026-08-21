@@ -54,8 +54,10 @@
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
         .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; }
         
-        /* เปลี่ยนกลับเป็น auto ให้นิ้วใช้งานได้ปกติ */
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: auto; }
+        /* กระดานหลักและกระดานกระจกใส */
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: auto; }
+        .main-canvas { cursor: crosshair; }
+        .draft-canvas { pointer-events: none; } /* แผ่นกระจกให้ทะลุการสัมผัสไปกระดานหลัก */
 
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
@@ -92,11 +94,11 @@
             
             <div class="slider-group">
                 <label>ขนาด:</label>
-                <input type="range" id="sizeSlider" min="1" max="50" value="5" oninput="currentSize = this.value">
+                <input type="range" id="sizeSlider" min="1" max="50" value="5" oninput="currentSize = parseInt(this.value)">
             </div>
             <div class="slider-group">
                 <label>ความเข้ม:</label>
-                <input type="range" id="opacitySlider" min="0.1" max="1" step="0.1" value="1" oninput="currentOpacity = this.value">
+                <input type="range" id="opacitySlider" min="0.1" max="1" step="0.1" value="1" oninput="currentOpacity = parseFloat(this.value)">
             </div>
         </div>
     </div>
@@ -193,24 +195,35 @@
             img.className = "bg-img";
             img.src = url;
             
+            // 1. กระดานหลัก (บันทึกเส้นจริง)
             const canvas = document.createElement('canvas');
             canvas.id = `canvas-page-${index}`;
+            canvas.className = "main-canvas";
+            
+            // 2. กระดานกระจกใส (ใช้วาดชั่วคราวเพื่อแก้ปัญหาสีทับกันไม่เนียน)
+            const draftCanvas = document.createElement('canvas');
+            draftCanvas.id = `draft-canvas-${index}`;
+            draftCanvas.className = "draft-canvas";
             
             img.onload = () => {
                 canvas.width = img.naturalWidth;
                 canvas.height = img.naturalHeight;
+                draftCanvas.width = img.naturalWidth;
+                draftCanvas.height = img.naturalHeight;
                 backgroundImages[index] = img; 
             };
 
             wrapper.appendChild(img);
             wrapper.appendChild(canvas);
+            wrapper.appendChild(draftCanvas); // ซ้อนเข้าไปอีกชั้น
             workspace.appendChild(wrapper);
 
-            setupDrawingSystem(canvas, index);
+            setupDrawingSystem(canvas, draftCanvas, index);
         }
 
-        function setupDrawingSystem(canvas, pageIndex) {
+        function setupDrawingSystem(canvas, draftCanvas, pageIndex) {
             const ctx = canvas.getContext('2d', { willReadFrequently: true }); 
+            const draftCtx = draftCanvas.getContext('2d', { willReadFrequently: true }); 
             let isDrawing = false;
             let lastX = 0, lastY = 0;
 
@@ -224,8 +237,8 @@
                 };
             }
 
-            // ฟังก์ชันเริ่มวาด
             function startAction(x, y) {
+                // เซฟประวัติ Undo
                 globalUndoStack.push({
                     index: pageIndex,
                     imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -235,46 +248,76 @@
 
                 isDrawing = true;
                 lastX = x; lastY = y;
+                
+                // ตั้งค่าความโปร่งแสงของกระจกใสล่วงหน้า
+                if (currentTool === 'highlighter') {
+                    draftCanvas.style.opacity = currentOpacity * 0.3; // ไฮไลท์จางๆ
+                } else if (currentTool === 'pen') {
+                    draftCanvas.style.opacity = currentOpacity;
+                }
             }
 
-            // ฟังก์ชันขีดเขียน
             function drawAction(x, y, pressure) {
                 if (!isDrawing) return;
                 
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                
                 if (currentTool === 'eraser') {
+                    // ยางลบให้ลบกระดานจริงทันที
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.globalAlpha = 1.0; 
                     ctx.lineWidth = currentSize * 5; 
                     ctx.strokeStyle = "rgba(0,0,0,1)";
-                } else if (currentTool === 'highlighter') {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.globalAlpha = currentOpacity * 0.3; 
-                    ctx.lineWidth = currentSize * 4;
-                    ctx.strokeStyle = currentColor;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(lastX, lastY);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
                 } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.globalAlpha = currentOpacity;
-                    ctx.lineWidth = (pressure * currentSize * 2) + 1; 
-                    ctx.strokeStyle = currentColor;
-                }
+                    // ปากกาและไฮไลท์ วาดลงกระจกใสแบบทึบ 100% เสมอ (ป้องกันจุดทับกันแล้วเข้มขึ้น)
+                    draftCtx.lineCap = 'round';
+                    draftCtx.lineJoin = 'round';
+                    draftCtx.globalCompositeOperation = 'source-over';
+                    draftCtx.globalAlpha = 1.0; 
+                    
+                    if (currentTool === 'highlighter') {
+                        draftCtx.lineWidth = currentSize * 4;
+                        draftCtx.strokeStyle = currentColor;
+                    } else {
+                        draftCtx.lineWidth = (pressure * currentSize * 2) + 1; 
+                        draftCtx.strokeStyle = currentColor;
+                    }
 
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(x, y);
-                ctx.stroke();
+                    draftCtx.beginPath();
+                    draftCtx.moveTo(lastX, lastY);
+                    draftCtx.lineTo(x, y);
+                    draftCtx.stroke();
+                }
 
                 lastX = x; lastY = y;
             }
 
             function stopAction() {
-                isDrawing = false;
+                if (isDrawing) {
+                    if (currentTool !== 'eraser') {
+                        // ปั๊มจากกระจกใส ลงสู่กระดานหลัก
+                        ctx.globalCompositeOperation = 'source-over';
+                        if (currentTool === 'highlighter') {
+                            ctx.globalAlpha = currentOpacity * 0.3;
+                        } else {
+                            ctx.globalAlpha = currentOpacity;
+                        }
+                        ctx.drawImage(draftCanvas, 0, 0);
+                        
+                        // ล้างกระจกใสทิ้ง เตรียมพร้อมวาดเส้นต่อไป
+                        draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
+                    }
+                    isDrawing = false;
+                }
             }
 
             // ==========================================
-            // 1. รองรับการใช้เมาส์วาด (สำหรับคอมพิวเตอร์)
+            // เมาส์
             // ==========================================
             canvas.addEventListener('mousedown', (e) => {
                 const pos = getPos(e.clientX, e.clientY);
@@ -288,16 +331,14 @@
             canvas.addEventListener('mouseleave', stopAction);
 
             // ==========================================
-            // 2. รองรับ Apple Pencil แยกกับนิ้ว (สำหรับ iPad)
+            // Apple Pencil
             // ==========================================
             canvas.addEventListener('touchstart', (e) => {
-                // ถ้าเป็นปากกา (Stylus) ให้ล็อกหน้าจอและเริ่มวาด
                 if (e.touches && e.touches[0].touchType === 'stylus') {
                     e.preventDefault(); 
                     const pos = getPos(e.touches[0].clientX, e.touches[0].clientY);
                     startAction(pos.x, pos.y);
                 }
-                // ถ้าเป็นนิ้ว (touchType = 'direct') จะถูกปัดตกไป ไม่บล็อกการเลื่อน
             }, { passive: false });
 
             canvas.addEventListener('touchmove', (e) => {
@@ -314,8 +355,12 @@
             canvas.addEventListener('touchcancel', stopAction);
         }
 
+        // ==========================================
+        // ระบบเซฟรูป
+        // ==========================================
         function downloadAll() {
-            const canvases = document.querySelectorAll('canvas');
+            // โหลดเฉพาะกระดานหลัก (ไม่เอากระจกใส)
+            const canvases = document.querySelectorAll('.main-canvas');
             if (canvases.length === 0) return;
 
             canvases.forEach((drawCanvas, index) => {
