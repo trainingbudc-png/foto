@@ -54,10 +54,9 @@
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
         .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; }
         
-        /* กระดานหลักและกระดานกระจกใส */
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: auto; }
         .main-canvas { cursor: crosshair; }
-        .draft-canvas { pointer-events: none; } /* แผ่นกระจกให้ทะลุการสัมผัสไปกระดานหลัก */
+        .draft-canvas { pointer-events: none; } 
 
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
@@ -73,7 +72,8 @@
 
     <div class="header-tools">
         <div class="top-row">
-            <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
+            <!-- 🛡️ เปลี่ยนฟังก์ชันปุ่มกลับ ให้คอยถามก่อนออก -->
+            <button class="btn-back" onclick="goBack()">⬅️ กลับ</button>
             <button class="btn-undo" onclick="undo()">↩️ ย้อนกลับ</button>
             <button class="btn-redo" onclick="redo()">ทำซ้ำ ↪️</button>
             <button id="btnTheme" onclick="toggleTheme()">🌙 กลางคืน</button>
@@ -106,6 +106,26 @@
     <div id="workspace"></div>
 
     <script>
+        // ==========================================
+        // 🛡️ ระบบป้องกันการเผลอปิดแท็บ หรือ ปิดหน้าเว็บ
+        // ==========================================
+        let isSafeToLeave = false; 
+
+        window.addEventListener('beforeunload', function (e) {
+            if (!isSafeToLeave) {
+                e.preventDefault();
+                e.returnValue = ''; // บังคับให้เบราว์เซอร์โชว์แจ้งเตือน
+            }
+        });
+
+        // 🛡️ ฟังก์ชันเมื่อกดปุ่ม "กลับ" ในแอป
+        function goBack() {
+            if(confirm('คุณต้องการออกจากหน้านี้ใช่ไหม?\n(ข้อมูลลายมือที่ยังไม่ได้กดเซฟจะหายไปนะ)')) {
+                isSafeToLeave = true; 
+                window.location.href = 'index.html';
+            }
+        }
+
         const workspace = document.getElementById('workspace');
         const drawingTools = document.getElementById('drawingTools');
         
@@ -195,12 +215,10 @@
             img.className = "bg-img";
             img.src = url;
             
-            // 1. กระดานหลัก (บันทึกเส้นจริง)
             const canvas = document.createElement('canvas');
             canvas.id = `canvas-page-${index}`;
             canvas.className = "main-canvas";
             
-            // 2. กระดานกระจกใส (ใช้วาดชั่วคราวเพื่อแก้ปัญหาสีทับกันไม่เนียน)
             const draftCanvas = document.createElement('canvas');
             draftCanvas.id = `draft-canvas-${index}`;
             draftCanvas.className = "draft-canvas";
@@ -215,7 +233,7 @@
 
             wrapper.appendChild(img);
             wrapper.appendChild(canvas);
-            wrapper.appendChild(draftCanvas); // ซ้อนเข้าไปอีกชั้น
+            wrapper.appendChild(draftCanvas);
             workspace.appendChild(wrapper);
 
             setupDrawingSystem(canvas, draftCanvas, index);
@@ -238,7 +256,6 @@
             }
 
             function startAction(x, y) {
-                // เซฟประวัติ Undo
                 globalUndoStack.push({
                     index: pageIndex,
                     imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -249,9 +266,8 @@
                 isDrawing = true;
                 lastX = x; lastY = y;
                 
-                // ตั้งค่าความโปร่งแสงของกระจกใสล่วงหน้า
                 if (currentTool === 'highlighter') {
-                    draftCanvas.style.opacity = currentOpacity * 0.3; // ไฮไลท์จางๆ
+                    draftCanvas.style.opacity = currentOpacity * 0.3;
                 } else if (currentTool === 'pen') {
                     draftCanvas.style.opacity = currentOpacity;
                 }
@@ -261,7 +277,6 @@
                 if (!isDrawing) return;
                 
                 if (currentTool === 'eraser') {
-                    // ยางลบให้ลบกระดานจริงทันที
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     ctx.globalCompositeOperation = 'destination-out';
@@ -274,7 +289,6 @@
                     ctx.lineTo(x, y);
                     ctx.stroke();
                 } else {
-                    // ปากกาและไฮไลท์ วาดลงกระจกใสแบบทึบ 100% เสมอ (ป้องกันจุดทับกันแล้วเข้มขึ้น)
                     draftCtx.lineCap = 'round';
                     draftCtx.lineJoin = 'round';
                     draftCtx.globalCompositeOperation = 'source-over';
@@ -300,7 +314,6 @@
             function stopAction() {
                 if (isDrawing) {
                     if (currentTool !== 'eraser') {
-                        // ปั๊มจากกระจกใส ลงสู่กระดานหลัก
                         ctx.globalCompositeOperation = 'source-over';
                         if (currentTool === 'highlighter') {
                             ctx.globalAlpha = currentOpacity * 0.3;
@@ -308,17 +321,12 @@
                             ctx.globalAlpha = currentOpacity;
                         }
                         ctx.drawImage(draftCanvas, 0, 0);
-                        
-                        // ล้างกระจกใสทิ้ง เตรียมพร้อมวาดเส้นต่อไป
                         draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
                     }
                     isDrawing = false;
                 }
             }
 
-            // ==========================================
-            // เมาส์
-            // ==========================================
             canvas.addEventListener('mousedown', (e) => {
                 const pos = getPos(e.clientX, e.clientY);
                 startAction(pos.x, pos.y);
@@ -330,9 +338,6 @@
             canvas.addEventListener('mouseup', stopAction);
             canvas.addEventListener('mouseleave', stopAction);
 
-            // ==========================================
-            // Apple Pencil
-            // ==========================================
             canvas.addEventListener('touchstart', (e) => {
                 if (e.touches && e.touches[0].touchType === 'stylus') {
                     e.preventDefault(); 
@@ -356,10 +361,12 @@
         }
 
         // ==========================================
-        // ระบบเซฟรูป
+        // 💾 ระบบเซฟรูป
         // ==========================================
         function downloadAll() {
-            // โหลดเฉพาะกระดานหลัก (ไม่เอากระจกใส)
+            // อนุญาตให้ดาวน์โหลดได้โดยไม่ให้เด้งถามกวนใจ
+            isSafeToLeave = true; 
+
             const canvases = document.querySelectorAll('.main-canvas');
             if (canvases.length === 0) return;
 
@@ -382,6 +389,11 @@
                     link.click();
                 }, index * 400); 
             });
+
+            // รอโหลดเสร็จ แล้วค่อยเปิดระบบป้องกันต่อ (เผื่อวาดต่อ)
+            setTimeout(() => {
+                isSafeToLeave = false;
+            }, canvases.length * 400 + 500);
         }
     </script>
 </body>
