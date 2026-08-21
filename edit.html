@@ -35,10 +35,12 @@
         
         .btn-back { background: #555; color: white; }
         .btn-save { background: #34C759; color: white; }
-        #btnToggleMode { background: #007AFF; color: white; font-size: 16px; padding: 10px 20px;}
+        
+        /* ซ่อนปุ่มสลับโหมดแล้ว เพราะนิ้วเลื่อนได้ ปากกาวาดได้พร้อมกัน */
+        #btnToggleMode { display: none; } 
+        
         #btnTheme { background: #333; color: white; }
         
-        /* ปุ่ม Undo & Redo */
         .btn-undo { background: #FF9500; color: white; font-size: 16px; padding: 10px 15px; } 
         .btn-redo { background: #8E8E93; color: white; font-size: 16px; padding: 10px 15px; } 
         
@@ -55,10 +57,9 @@
         
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
         .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-
-        .mode-draw canvas { touch-action: none; cursor: crosshair; pointer-events: auto; }
-        .mode-scroll canvas { touch-action: auto; pointer-events: none; }
+        
+        /* 🚀 เอาคำสั่งล็อกจอออก เพื่อให้นิ้วสามารถซูมและเลื่อนได้ปกติ */
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: auto; }
 
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
@@ -75,9 +76,7 @@
     <div class="header-tools">
         <div class="top-row">
             <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
-            <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาด</button>
             
-            <!-- ✨ ปุ่ม Undo & Redo ✨ -->
             <button class="btn-undo" onclick="undo()">↩️ ย้อนกลับ</button>
             <button class="btn-redo" onclick="redo()">ทำซ้ำ ↪️</button>
             
@@ -108,70 +107,52 @@
         </div>
     </div>
 
-    <div id="workspace" class="mode-draw"></div>
+    <div id="workspace"></div>
 
     <script>
         const workspace = document.getElementById('workspace');
         const drawingTools = document.getElementById('drawingTools');
         
-        let currentMode = 'draw';
         let isDarkMode = false;
-        
         let currentTool = 'pen'; 
         let currentColor = '#000000';
         let currentSize = 5;
         let currentOpacity = 1.0;
         let backgroundImages = []; 
 
-        // ==========================================
-        // 🌟 ระบบ UNDO / REDO
-        // ==========================================
-        let globalUndoStack = []; // เก็บประวัติวาด
-        let globalRedoStack = []; // เก็บประวัติที่โดนย้อนกลับไป (เผื่อทำซ้ำ)
+        let globalUndoStack = []; 
+        let globalRedoStack = []; 
 
         function undo() {
             if (globalUndoStack.length === 0) return;
-            
             const lastState = globalUndoStack.pop();
             const targetCanvas = document.getElementById(`canvas-page-${lastState.index}`);
             
             if (targetCanvas) {
                 const ctx = targetCanvas.getContext('2d');
-                
-                // ก่อนจะย้อนกลับ ให้แอบเซฟภาพปัจจุบันไปเก็บไว้ในกล่อง Redo ก่อน
                 globalRedoStack.push({
                     index: lastState.index,
                     imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
                 });
-
-                // วาดภาพย้อนหลัง
                 ctx.putImageData(lastState.imageData, 0, 0);
             }
         }
 
         function redo() {
             if (globalRedoStack.length === 0) return;
-            
             const nextState = globalRedoStack.pop();
             const targetCanvas = document.getElementById(`canvas-page-${nextState.index}`);
             
             if (targetCanvas) {
                 const ctx = targetCanvas.getContext('2d');
-                
-                // ก่อนจะเดินหน้า ให้เซฟภาพปัจจุบันกลับไปไว้ในกล่อง Undo
                 globalUndoStack.push({
                     index: nextState.index,
                     imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
                 });
-
-                // วาดภาพไปข้างหน้า
                 ctx.putImageData(nextState.imageData, 0, 0);
             }
         }
 
-        // ==========================================
-        // ระบบอื่นๆ (กลางคืน, เปลี่ยนโหมด)
-        // ==========================================
         function toggleTheme() {
             isDarkMode = !isDarkMode;
             document.body.classList.toggle('dark-theme', isDarkMode);
@@ -183,25 +164,6 @@
             } else {
                 btn.innerHTML = '🌙 กลางคืน';
                 btn.style.background = '#333';
-            }
-        }
-
-        function toggleMode() {
-            const btn = document.getElementById('btnToggleMode');
-            if (currentMode === 'draw') {
-                currentMode = 'scroll';
-                workspace.className = 'mode-scroll'; 
-                btn.innerHTML = '👆 โหมดเลื่อน';
-                btn.style.background = '#FF9500'; 
-                drawingTools.style.opacity = '0.4'; 
-                drawingTools.style.pointerEvents = 'none';
-            } else {
-                currentMode = 'draw';
-                workspace.className = 'mode-draw';
-                btn.innerHTML = '✍️ โหมดวาด';
-                btn.style.background = '#007AFF'; 
-                drawingTools.style.opacity = '1';
-                drawingTools.style.pointerEvents = 'auto';
             }
         }
 
@@ -259,6 +221,19 @@
             let isDrawing = false;
             let lastX = 0, lastY = 0;
 
+            // 🚀 ป้องกันเฉพาะ Apple Pencil ไม่ให้เลื่อนจอ (แต่ยอมให้นิ้วเลื่อนจอได้ปกติ)
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches && e.touches[0].touchType === 'stylus') {
+                    e.preventDefault(); 
+                }
+            }, { passive: false });
+            
+            canvas.addEventListener('touchmove', (e) => {
+                if (e.touches && e.touches[0].touchType === 'stylus') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
             function getPos(e) {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
@@ -270,14 +245,14 @@
             }
 
             canvas.addEventListener('pointerdown', (e) => {
-                // ก่อนขีดเขียน เซฟประวัติปัจจุบันไว้ใน Undo
+                // 🚀 ถ้านิ้วสัมผัส ให้ปัดตกการวาดไปเลย (ปล่อยให้เบราว์เซอร์จัดการเลื่อน/ซูม)
+                if (e.pointerType === 'touch') return;
+
                 globalUndoStack.push({
                     index: pageIndex,
                     imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
                 });
                 if (globalUndoStack.length > 50) globalUndoStack.shift();
-                
-                // ✨ สำคัญมาก: พอเริ่มเขียนเส้นใหม่ปุ๊บ ต้องล้างประวัติ Redo ทิ้งให้หมด ✨
                 globalRedoStack = [];
 
                 isDrawing = true;
@@ -288,7 +263,9 @@
 
             canvas.addEventListener('pointermove', (e) => {
                 if (!isDrawing) return;
-                const pos = getPos(e);
+                
+                // 🚀 ย้ำอีกรอบ ถ้านิ้วถูจอ ห้ามวาด!
+                if (e.pointerType === 'touch') return;
                 
                 let pressure = e.pressure !== undefined ? e.pressure : 0.5;
                 if (e.pointerType === 'mouse') pressure = 0.5; 
