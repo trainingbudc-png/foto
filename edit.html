@@ -5,18 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>พื้นที่ทำแบบฝึกหัด (Pro Mode)</title>
     <style>
-        body { font-family: sans-serif; background-color: #e9ecef; text-align: center; margin: 0; padding: 15px; }
+        /* บล็อกไม่ให้เมนู Copy/Paste ของ iPad เด้งขึ้นมา */
+        * {
+            -webkit-touch-callout: none; 
+            -webkit-user-select: none;   
+            user-select: none;           
+        }
+        input {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+
+        body { font-family: sans-serif; background-color: #e9ecef; text-align: center; margin: 0; padding: 15px; transition: background-color 0.3s; }
         
         .header-tools { 
             position: sticky; top: 0; z-index: 100;
             background: white; padding: 15px; border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;
+            transition: all 0.3s;
         }
         .top-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         .bottom-row { 
             display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; 
-            background: #f8f9fa; padding: 12px; border-radius: 8px;
+            background: #f8f9fa; padding: 12px; border-radius: 8px; transition: background 0.3s;
         }
         
         button { padding: 10px 15px; font-size: 14px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; transition: 0.2s;}
@@ -25,25 +37,39 @@
         .btn-back { background: #555; color: white; }
         .btn-save { background: #34C759; color: white; }
         #btnToggleMode { background: #007AFF; color: white; font-size: 16px; padding: 10px 25px;}
+        #btnTheme { background: #333; color: white; }
         
-        .tool-btn { background: #e0e0e0; color: #333; border: 2px solid transparent; }
+        .tool-btn { background: #e0e0e0; color: #333; border: 2px solid transparent; transition: all 0.2s; }
         .tool-btn.active { border: 2px solid #007AFF; background: #d1e7dd; }
         
-        .divider { border-left: 2px solid #ccc; height: 30px; margin: 0 5px; }
+        .divider { border-left: 2px solid #ccc; height: 30px; margin: 0 5px; transition: border-color 0.3s; }
         
-        /* สไตล์ของตัวเลือกสีและสไลเดอร์ */
         input[type="color"] { width: 40px; height: 40px; border: none; border-radius: 5px; cursor: pointer; padding: 0; background: none;}
-        .slider-group { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: #555;}
+        .slider-group { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: #555; transition: color 0.3s; }
         input[type="range"] { cursor: pointer; width: 100px; }
 
         #workspace { width: 100%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
         
         .canvas-wrapper { position: relative; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; }
-        .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; }
+        .bg-img { width: 100%; display: block; user-select: none; pointer-events: none; transition: filter 0.3s;}
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
         .mode-draw canvas { touch-action: none; cursor: crosshair; pointer-events: auto; }
         .mode-scroll canvas { touch-action: auto; pointer-events: none; }
+
+        /* ========================================= */
+        /* 🌙 ธีมกลางคืน (Dark Mode Styles) */
+        /* ========================================= */
+        body.dark-theme { background-color: #121212; }
+        body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        body.dark-theme .bottom-row { background: #3a3a3a; }
+        body.dark-theme .slider-group { color: #eee; }
+        body.dark-theme .divider { border-left-color: #555; }
+        body.dark-theme .tool-btn { background: #555; color: white; }
+        body.dark-theme .tool-btn.active { background: #005bb5; border-color: #4da3ff; }
+        body.dark-theme .canvas-wrapper { background: #000; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
+        /* กลับสีรูปโจทย์ (ขาวเป็นดำ) แต่รักษาสีเดิมของรูปไว้ด้วย hue-rotate */
+        body.dark-theme .bg-img { filter: invert(1) hue-rotate(180deg); }
     </style>
 </head>
 <body>
@@ -53,25 +79,26 @@
         <div class="top-row">
             <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
             <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาดเขียน</button>
+            
+            <!-- ✨ ปุ่มใหม่: สลับกลางวัน/กลางคืน ✨ -->
+            <button id="btnTheme" onclick="toggleTheme()">🌙 โหมดกลางคืน</button>
+            
             <button class="btn-save" onclick="downloadAll()">💾 เซฟรูป</button>
         </div>
         
         <!-- แถวล่าง: เครื่องมือ Pro -->
         <div class="bottom-row" id="drawingTools">
-            <!-- หมวดเครื่องมือ -->
             <button class="tool-btn active" id="btnPen" onclick="setTool('pen', this)">🖊️ ปากกา</button>
             <button class="tool-btn" id="btnHighlighter" onclick="setTool('highlighter', this)">🖍️ ไฮไลท์</button>
             <button class="tool-btn" id="btnEraser" onclick="setTool('eraser', this)">🧽 ยางลบ</button>
             
             <span class="divider"></span>
             
-            <!-- หมวดสี -->
-            <label style="font-size: 14px; font-weight: bold; color: #555;">สี:</label>
+            <label style="font-size: 14px; font-weight: bold; color: inherit;" class="slider-group">สี:</label>
             <input type="color" id="colorPicker" value="#000000" onchange="currentColor = this.value; setTool(currentTool === 'eraser' ? 'pen' : currentTool, currentTool === 'eraser' ? document.getElementById('btnPen') : null)">
             
             <span class="divider"></span>
             
-            <!-- หมวดปรับขนาดและความเข้ม -->
             <div class="slider-group">
                 <label>ขนาด:</label>
                 <input type="range" id="sizeSlider" min="1" max="50" value="5" oninput="currentSize = this.value">
@@ -83,23 +110,53 @@
         </div>
     </div>
 
-    <div id="workspace" class="mode-draw">
-        <!-- หน้ากระดาษจะถูกสร้างตรงนี้ -->
-    </div>
+    <div id="workspace" class="mode-draw"></div>
 
     <script>
         const workspace = document.getElementById('workspace');
         const drawingTools = document.getElementById('drawingTools');
-        let currentMode = 'draw';
         
-        // ค่าเริ่มต้นของเครื่องมือ
+        let currentMode = 'draw';
+        let isDarkMode = false;
+        
         let currentTool = 'pen'; 
         let currentColor = '#000000';
         let currentSize = 5;
         let currentOpacity = 1.0;
-
         let backgroundImages = []; 
 
+        // ==========================================
+        // ระบบสลับกลางวัน / กลางคืน
+        // ==========================================
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-theme', isDarkMode);
+            
+            const btn = document.getElementById('btnTheme');
+            const colorPicker = document.getElementById('colorPicker');
+
+            if (isDarkMode) {
+                btn.innerHTML = '☀️ โหมดกลางวัน';
+                btn.style.background = '#f39c12';
+                // ถ้าสลับเป็นจอดำ แล้วปากกายังเป็นสีดำอยู่ ให้เปลี่ยนปากกาเป็นสีขาวอัตโนมัติ
+                if (currentColor === '#000000') {
+                    currentColor = '#ffffff';
+                    colorPicker.value = '#ffffff';
+                }
+            } else {
+                btn.innerHTML = '🌙 โหมดกลางคืน';
+                btn.style.background = '#333';
+                // ถ้าสลับกลับเป็นจอขาว แล้วปากกาเป็นสีขาวอยู่ ให้เปลี่ยนปากกาเป็นสีดำอัตโนมัติ
+                if (currentColor === '#ffffff') {
+                    currentColor = '#000000';
+                    colorPicker.value = '#000000';
+                }
+            }
+        }
+
+        // ==========================================
+        // ระบบสลับโหมดวาด / เลื่อนหน้าจอ
+        // ==========================================
         function toggleMode() {
             const btn = document.getElementById('btnToggleMode');
             if (currentMode === 'draw') {
@@ -121,15 +178,11 @@
 
         function setTool(tool, btnElement) {
             currentTool = tool;
-            
-            // เปลี่ยนสีปุ่มที่ถูกเลือก
             const btns = drawingTools.querySelectorAll('.tool-btn');
             btns.forEach(b => b.classList.remove('active'));
-            
             if(btnElement) {
                 btnElement.classList.add('active');
             } else {
-                // กรณีเลือกสีแล้วเด้งกลับมาที่ปากกาอัตโนมัติ
                 document.getElementById(tool === 'highlighter' ? 'btnHighlighter' : 'btnPen').classList.add('active');
             }
         }
@@ -198,7 +251,6 @@
                 if (!isDrawing) return;
                 const pos = getPos(e);
                 
-                // รองรับน้ำหนักมือ Apple Pencil
                 let pressure = e.pressure !== undefined ? e.pressure : 0.5;
                 if (e.pointerType === 'mouse') pressure = 0.5; 
                 
@@ -206,19 +258,16 @@
                 ctx.lineJoin = 'round';
                 
                 if (currentTool === 'eraser') {
-                    // โหมดยางลบ
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.globalAlpha = 1.0; 
-                    ctx.lineWidth = currentSize * 5; // ยางลบจะขนาดใหญ่กว่าปกติ 5 เท่าเพื่อให้ลบง่าย
+                    ctx.lineWidth = currentSize * 5; 
                     ctx.strokeStyle = "rgba(0,0,0,1)";
                 } else if (currentTool === 'highlighter') {
-                    // โหมดไฮไลท์ (สีจะโปร่งแสงกว่าปกติ)
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.globalAlpha = currentOpacity * 0.3; 
                     ctx.lineWidth = currentSize * 4;
                     ctx.strokeStyle = currentColor;
                 } else {
-                    // โหมดปากกาปกติ
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.globalAlpha = currentOpacity;
                     ctx.lineWidth = (pressure * currentSize * 2) + 1; 
@@ -239,6 +288,9 @@
             canvas.addEventListener('pointercancel', stopDrawing);
         }
 
+        // ==========================================
+        // ระบบเซฟรูปภาพ (ดักโหมดกลางคืนไว้ให้แล้ว)
+        // ==========================================
         function downloadAll() {
             const canvases = document.querySelectorAll('canvas');
             if (canvases.length === 0) return;
@@ -250,9 +302,19 @@
                     exportCanvas.height = drawCanvas.height;
                     const ctx = exportCanvas.getContext('2d');
 
+                    // ถ้าเปิดโหมดกลางคืนอยู่ ให้กลับสีพื้นหลังตอนเซฟด้วย จะได้รูปพื้นดำ
+                    if (isDarkMode) {
+                        ctx.filter = 'invert(1) hue-rotate(180deg)';
+                    } else {
+                        ctx.filter = 'none';
+                    }
+
                     if (backgroundImages[index]) {
                         ctx.drawImage(backgroundImages[index], 0, 0);
                     }
+                    
+                    // ปิด Filter ก่อนวาดลายมือทับลงไป เพื่อให้สีปากกาคงเดิม
+                    ctx.filter = 'none';
                     ctx.drawImage(drawCanvas, 0, 0);
 
                     const link = document.createElement('a');
