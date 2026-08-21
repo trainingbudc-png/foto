@@ -3,331 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการระบบ (Admin)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-    </script>
+    <title>จัดการแบบฝึกหัด (Admin)</title>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: #f9fafb; /* สีเทาอ่อนมากๆ */
-            color: #1f2937;
-            text-align: center; 
-            padding: 40px 20px; 
-            margin: 0; 
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        
-        /* กล่องเนื้อหาแบบคลีน */
-        .box { 
-            background: white; 
-            max-width: 600px; 
-            margin: 0 auto 30px auto; 
-            padding: 40px 30px; 
-            border-radius: 16px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
-            border: 1px solid #f3f4f6;
-            text-align: left;
-        }
-        
-        h2, h3 { margin-top: 0; color: #111827; font-weight: 600; text-align: center; margin-bottom: 10px;}
-        .subtitle { text-align: center; color: #6b7280; font-size: 14px; margin-bottom: 25px; line-height: 1.5;}
-        
-        /* ช่องกรอกข้อความ */
-        input[type="text"] {
-            width: 100%; padding: 14px 16px; margin-bottom: 20px; 
-            border: 1px solid #d1d5db; border-radius: 10px; font-size: 15px;
-            box-sizing: border-box; outline: none; transition: 0.2s;
-            background-color: #f9fafb;
-        }
-        input[type="text"]:focus { 
-            border-color: #3b82f6; background-color: #fff;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); 
-        }
-        
-        /* ✨ กล่องเลือกไฟล์แบบเส้นประ (Dropzone) ✨ */
-        .file-upload-wrapper {
-            position: relative;
-            border: 2px dashed #d1d5db;
-            border-radius: 12px;
-            padding: 30px 20px;
-            text-align: center;
-            background: #f9fafb;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-bottom: 25px;
-        }
-        .file-upload-wrapper:hover { border-color: #3b82f6; background: #eff6ff; }
-        .file-upload-input { 
-            position: absolute; left: 0; top: 0; width: 100%; height: 100%; 
-            opacity: 0; cursor: pointer; 
-        }
-        .file-upload-text { color: #6b7280; font-size: 15px; font-weight: 500; pointer-events: none; }
-        .file-upload-icon { font-size: 24px; margin-bottom: 8px; display: block; pointer-events: none;}
 
-        /* ปุ่มต่างๆ */
-        button { 
-            font-family: inherit; font-size: 15px; font-weight: 600;
-            border: none; border-radius: 10px; cursor: pointer; transition: 0.2s;
+        body { 
+            background-color: #f4f5f7; 
+            margin: 0; 
+            padding: 40px 20px; 
+            color: #333;
         }
-        button:active { transform: scale(0.98); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        
-        .btn-upload { width: 100%; padding: 14px; background: #007AFF; color: white; font-size: 16px; box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);}
-        .btn-upload:hover:not(:disabled) { background: #0066cc; }
-        
-        /* ปุ่มกลับ */
-        .btn-back-wrapper { max-width: 600px; margin: 0 auto 20px auto; text-align: left; }
-        .btn-back { 
-            background: transparent; color: #4b5563; border: 1px solid #d1d5db; 
-            padding: 8px 16px; display: inline-flex; align-items: center; gap: 8px;
+
+        /* ปุ่มย้อนกลับ */
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            background: #ffffff;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            transition: all 0.2s;
+            cursor: pointer;
         }
-        .btn-back:hover { background: #f3f4f6; color: #111827; }
-        
-        /* สถานะ */
-        #status { margin-top: 15px; font-weight: 500; font-size: 14px; text-align: center; }
-        .loading { color: #f59e0b; }
-        .success { color: #10b981; }
-        .error { color: #ef4444; }
+        .btn-back:hover {
+            background: #f0f1f4;
+            transform: translateY(-1px);
+        }
+
+        /* กล่องเนื้อหาหลัก */
+        .admin-container {
+            background: #ffffff;
+            max-width: 700px;
+            margin: 0 auto;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        }
+
+        /* ส่วนหัว */
+        .header-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header-section h2 {
+            margin: 0 0 8px 0;
+            color: #1d1d1f;
+            font-size: 24px;
+        }
+        .header-section p {
+            margin: 0;
+            color: #86868b;
+            font-size: 14px;
+        }
+
+        /* ช่องค้นหา */
+        .search-container {
+            position: relative;
+            margin-bottom: 30px;
+        }
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #86868b;
+            font-size: 16px;
+        }
+        .search-input {
+            width: 100%;
+            padding: 14px 15px 14px 45px;
+            border: 1px solid #e0e0e5;
+            border-radius: 12px;
+            font-size: 15px;
+            background: #f9f9fb;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            background: #ffffff;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
 
         /* รายการแบบฝึกหัด */
-        .list-container { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
-        .list-item { 
-            display: flex; justify-content: space-between; align-items: center; 
-            background: #fff; padding: 12px 16px; border-radius: 12px; 
-            border: 1px solid #e5e7eb; transition: 0.2s;
+        .list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
-        .list-item:hover { border-color: #d1d5db; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
-        .list-info { display: flex; align-items: center; gap: 15px; }
-        .list-info img { 
-            width: 50px; height: 50px; object-fit: cover; 
-            border-radius: 8px; border: 1px solid #f3f4f6; 
+        .list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border: 1px solid #e0e0e5;
+            border-radius: 12px;
+            background: #ffffff;
+            transition: all 0.2s;
         }
-        .list-name { font-weight: 600; font-size: 15px; color: #374151; }
-        
-        /* ปุ่มลบแบบซอฟต์ (สีแดงอ่อน) */
-        .btn-delete { 
-            background: #fee2e2; color: #dc2626; padding: 8px 14px; font-size: 13px; 
+        .list-item:hover {
+            border-color: #d1d1d6;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
         }
-        .btn-delete:hover:not(:disabled) { background: #fecaca; }
+
+        /* ข้อมูลด้านซ้าย (รูป + ชื่อ) */
+        .item-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .item-thumb {
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid #eee;
+            background: #f4f5f7;
+        }
+        .item-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+
+        /* ปุ่มลบ */
+        .btn-delete {
+            background: #ffebeb;
+            color: #FF3B30;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-delete:hover {
+            background: #ffdbdb;
+            transform: scale(1.02);
+        }
+        .btn-delete:active {
+            transform: scale(0.95);
+        }
+
+        /* ข้อความเมื่อไม่พบข้อมูล */
+        .empty-state {
+            text-align: center;
+            padding: 40px 0;
+            color: #86868b;
+            font-size: 15px;
+            display: none;
+        }
     </style>
 </head>
 <body>
 
-    <div class="btn-back-wrapper">
-        <button class="btn-back" onclick="window.location.href='index.html'">← กลับหน้าหลัก</button>
+    <div style="max-width: 700px; margin: 0 auto;">
+        <button class="btn-back" onclick="window.location.href='index.html'">‹ กลับหน้าแรก</button>
     </div>
 
-    <!-- ส่วนที่ 1: อัปโหลด -->
-    <div class="box">
-        <h2>📁 เพิ่มแบบฝึกหัดใหม่</h2>
-        <div class="subtitle">รองรับไฟล์รูปภาพ และ <b>ไฟล์ PDF (รองรับหลายหน้า)</b><br>
-        <span style="font-size: 12px;">*หาก PDF มีหลายหน้า จะใช้เวลาอัปโหลดนานขึ้นตามจำนวนหน้า*</span></div>
-
-        <input type="text" id="fileName" placeholder="ตั้งชื่อแบบฝึกหัด..." required>
-        
-        <!-- ✨ กล่องอัปโหลดแบบคลีน ✨ -->
-        <div class="file-upload-wrapper">
-            <span class="file-upload-icon">📄</span>
-            <span class="file-upload-text" id="fileLabelText">คลิกเพื่อเลือกไฟล์ (JPG, PNG, PDF)</span>
-            <input type="file" id="fileInput" class="file-upload-input" accept="image/*, application/pdf" required>
+    <div class="admin-container">
+        <!-- ส่วนหัวที่ปรับคำใหม่ -->
+        <div class="header-section">
+            <h2>จัดการแบบฝึกหัด</h2>
+            <p>รายการแบบฝึกหัดทั้งหมด (โปรดระมัดระวัง การลบข้อมูลจะมีผลทันที)</p>
         </div>
-        
-        <button id="uploadBtn" class="btn-upload">อัปโหลดเข้าสู่ระบบ</button>
-        <div id="status"></div>
-    </div>
 
-    <!-- ส่วนที่ 2: จัดการข้อมูล -->
-    <div class="box">
-        <h3>จัดการ</h3>
-        <div class="subtitle">รายการทั้งหมดในระบบ (ลบแล้วข้อมูลจะหายไปจากหน้าแรกทันที)</div>
-        
-        <input type="text" id="adminSearchInput" placeholder="🔍 ค้นหาชื่อแบบฝึกหัด...">
-        
-        <div id="adminGallery" class="list-container">
-            <div class="loading" style="text-align: center;">⏳ กำลังโหลดข้อมูล...</div>
+        <!-- ช่องค้นหา -->
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" class="search-input" placeholder="ค้นหาชื่อแบบฝึกหัด..." onkeyup="filterItems()">
         </div>
+
+        <!-- รายการ (Container) -->
+        <div class="list-container" id="workbookList">
+            <!-- ตัวอย่างข้อมูล (เดี๋ยวเราใช้ JS ดึงจาก Firebase มาแทนที่ตรงนี้) -->
+            <div class="list-item">
+                <div class="item-info">
+                    <img src="https://via.placeholder.com/45" alt="thumb" class="item-thumb">
+                    <span class="item-name">แบบฝึกหัดที่ 2</span>
+                </div>
+                <button class="btn-delete" onclick="deleteItem('id_2')">ลบ</button>
+            </div>
+
+            <div class="list-item">
+                <div class="item-info">
+                    <img src="https://via.placeholder.com/45" alt="thumb" class="item-thumb">
+                    <span class="item-name">แบบฝึกหัดที่ 1</span>
+                </div>
+                <button class="btn-delete" onclick="deleteItem('id_1')">ลบ</button>
+            </div>
+        </div>
+
+        <div id="emptyState" class="empty-state">ไม่พบแบบฝึกหัดที่ค้นหา 🥲</div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, deleteDoc } 
-        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    <!-- Script สำหรับการค้นหาและลบ (สามารถนำไปเชื่อมต่อ Firebase ได้เลย) -->
+    <script>
+        // ฟังก์ชันค้นหาข้อมูลแบบ Real-time
+        function filterItems() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const items = document.querySelectorAll('.list-item');
+            let hasVisibleItem = false;
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD6X-sBEO8AqZF2i0qzJqyrwLU5FVtqQ5s",
-            authDomain: "ipad-drawing-app.firebaseapp.com",
-            projectId: "ipad-drawing-app",
-            storageBucket: "ipad-drawing-app.firebasestorage.app",
-            messagingSenderId: "1039285685408",
-            appId: "1:1039285685408:web:d1ae93d102084e2c3c0dc5"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const IMGBB_API_KEY = 'e0fa69420791826c629b428735db5af8';
-        
-        const adminGallery = document.getElementById('adminGallery');
-        const adminSearchInput = document.getElementById('adminSearchInput');
-        const fileInput = document.getElementById('fileInput');
-        const fileLabelText = document.getElementById('fileLabelText');
-        
-        let allAdminItems = []; 
-
-        // ✨ เปลี่ยนข้อความในกล่องอัปโหลดเมื่อเลือกไฟล์แล้ว ✨
-        fileInput.addEventListener('change', function(e) {
-            if(e.target.files.length > 0) {
-                fileLabelText.textContent = e.target.files[0].name;
-                fileLabelText.style.color = '#007AFF';
-            } else {
-                fileLabelText.textContent = 'คลิกเพื่อเลือกไฟล์ (JPG, PNG, PDF)';
-                fileLabelText.style.color = '#6b7280';
-            }
-        });
-
-        async function loadAdminGallery() {
-            adminGallery.innerHTML = '<div class="loading" style="text-align: center;">⏳ กำลังโหลดข้อมูล...</div>';
-            try {
-                const q = query(collection(db, "workbooks"), orderBy("createdAt", "desc"));
-                const querySnapshot = await getDocs(q);
-                allAdminItems = []; 
-                if(querySnapshot.empty) {
-                    adminGallery.innerHTML = "<p style='text-align: center; color: #9ca3af;'>ยังไม่มีแบบฝึกหัดในระบบ</p>"; return;
+            items.forEach(item => {
+                const name = item.querySelector('.item-name').innerText.toLowerCase();
+                if (name.includes(input)) {
+                    item.style.display = 'flex';
+                    hasVisibleItem = true;
+                } else {
+                    item.style.display = 'none';
                 }
-                querySnapshot.forEach((documentSnapshot) => {
-                    allAdminItems.push({ id: documentSnapshot.id, ...documentSnapshot.data() });
-                });
-                renderAdminList(allAdminItems);
-            } catch (error) {
-                adminGallery.innerHTML = "<p class='error' style='text-align: center;'>ไม่สามารถโหลดข้อมูลได้</p>";
-            }
-        }
-
-        function renderAdminList(itemsToRender) {
-            adminGallery.innerHTML = ''; 
-            if (itemsToRender.length === 0) { adminGallery.innerHTML = "<p style='text-align: center; color: #9ca3af;'>ไม่พบแบบฝึกหัดที่ค้นหา</p>"; return; }
-
-            itemsToRender.forEach((data) => {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'list-item';
-                
-                const coverImage = data.url.split('|')[0]; 
-
-                itemDiv.innerHTML = `
-                    <div class="list-info">
-                        <img src="${coverImage}" alt="${data.name}">
-                        <span class="list-name">${data.name}</span>
-                    </div>
-                `;
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn-delete';
-                deleteBtn.innerHTML = "ลบ";
-                deleteBtn.onclick = async () => {
-                    if (confirm(`ต้องการลบ: "${data.name}" ใช่หรือไม่?`)) {
-                        deleteBtn.innerHTML = "กำลังลบ...";
-                        deleteBtn.disabled = true;
-                        try {
-                            await deleteDoc(doc(db, "workbooks", data.id));
-                            loadAdminGallery(); adminSearchInput.value = ''; 
-                        } catch (error) {
-                            alert("เกิดข้อผิดพลาดในการลบ"); deleteBtn.disabled = false;
-                        }
-                    }
-                };
-                itemDiv.appendChild(deleteBtn);
-                adminGallery.appendChild(itemDiv);
             });
+
+            // แสดงข้อความถ้าหาไม่เจอ
+            document.getElementById('emptyState').style.display = hasVisibleItem ? 'none' : 'block';
         }
 
-        adminSearchInput.addEventListener('input', (e) => {
-            renderAdminList(allAdminItems.filter(item => item.name.toLowerCase().includes(e.target.value.toLowerCase())));
-        });
-        loadAdminGallery();
-
-        document.getElementById('uploadBtn').addEventListener('click', async () => {
-            const fileName = document.getElementById('fileName').value;
-            const statusDiv = document.getElementById('status');
-            const btn = document.getElementById('uploadBtn');
-
-            if (!fileName || !fileInput.files[0]) { alert('กรุณากรอกชื่อและเลือกไฟล์'); return; }
-
-            statusDiv.className = "loading";
-            btn.disabled = true;
-            btn.innerHTML = "กำลังประมวลผล...";
-            let finalImageUrl = ""; 
-
-            try {
-                if (fileInput.files[0].type === "application/pdf") {
-                    statusDiv.innerHTML = "กำลังอ่านไฟล์ PDF...";
-                    const arrayBuffer = await fileInput.files[0].arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-                    const totalPages = pdf.numPages; 
-                    
-                    let uploadedUrls = []; 
-
-                    for (let i = 1; i <= totalPages; i++) {
-                        statusDiv.innerHTML = `กำลังแปลงและอัปโหลดหน้า ${i} / ${totalPages}...`;
-                        
-                        const page = await pdf.getPage(i);
-                        const viewport = page.getViewport({ scale: 2.0 }); 
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = viewport.width; canvas.height = viewport.height;
-                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                        
-                        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-                        const formData = new FormData();
-                        formData.append('image', blob, `page_${i}.jpg`);
-                        
-                        const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                            method: 'POST', body: formData
-                        });
-                        const imgbbData = await imgbbRes.json();
-                        
-                        if (!imgbbData.success) throw new Error(`อัปโหลดหน้า ${i} ไม่สำเร็จ`);
-                        uploadedUrls.push(imgbbData.data.url);
-                    }
-                    finalImageUrl = uploadedUrls.join('|'); 
-                } 
-                else {
-                    statusDiv.innerHTML = "กำลังอัปโหลดรูปภาพ...";
-                    const formData = new FormData();
-                    formData.append('image', fileInput.files[0]);
-                    const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                        method: 'POST', body: formData
-                    });
-                    const imgbbData = await imgbbRes.json();
-                    if (!imgbbData.success) throw new Error("อัปโหลดรูปไม่สำเร็จ");
-                    finalImageUrl = imgbbData.data.url; 
-                }
-
-                statusDiv.innerHTML = "กำลังบันทึกลงฐานข้อมูล...";
-                await addDoc(collection(db, "workbooks"), {
-                    name: fileName,
-                    url: finalImageUrl, 
-                    createdAt: serverTimestamp()
-                });
-
-                statusDiv.innerHTML = "✅ อัปโหลดสำเร็จเรียบร้อย!";
-                statusDiv.className = "success";
+        // ฟังก์ชันลบข้อมูล (เชื่อมกับ Firebase ต่อได้เลย)
+        function deleteItem(docId) {
+            if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบแบบฝึกหัดนี้?\n(ข้อมูลจะไม่สามารถกู้คืนได้)')) {
+                // ใส่โค้ด Firebase ลบข้อมูลที่นี่ เช่น:
+                // await deleteDoc(doc(db, "workbooks", docId));
                 
-                // คืนค่าฟอร์มกลับเป็นค่าเริ่มต้น
-                document.getElementById('fileName').value = '';
-                fileInput.value = '';
-                fileLabelText.textContent = 'คลิกเพื่อเลือกไฟล์ (JPG, PNG, PDF)';
-                fileLabelText.style.color = '#6b7280';
-                adminSearchInput.value = ''; 
-                loadAdminGallery(); 
-
-            } catch (error) {
-                statusDiv.innerHTML = "❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
-                statusDiv.className = "error";
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = "อัปโหลดเข้าสู่ระบบ";
-                setTimeout(() => { statusDiv.innerHTML = ""; }, 5000);
+                alert('ลบข้อมูลเรียบร้อยแล้ว (จำลอง)');
+                // หลังจากลบเสร็จ ให้ดึงข้อมูลมาแสดงใหม่ หรือซ่อน item นั้นไปก่อน
+                // ...
             }
-        });
+        }
     </script>
+
 </body>
 </html>
