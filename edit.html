@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>พื้นที่ทำแบบฝึกหัด (Pro Mode)</title>
     <style>
-        /* บล็อกไม่ให้เมนู Copy/Paste ของ iPad เด้งขึ้นมา */
         * {
             -webkit-touch-callout: none; 
             -webkit-user-select: none;   
@@ -36,9 +35,12 @@
         
         .btn-back { background: #555; color: white; }
         .btn-save { background: #34C759; color: white; }
-        #btnToggleMode { background: #007AFF; color: white; font-size: 16px; padding: 10px 25px;}
+        #btnToggleMode { background: #007AFF; color: white; font-size: 16px; padding: 10px 20px;}
         #btnTheme { background: #333; color: white; }
-        .btn-undo { background: #FF9500; color: white; font-size: 16px; padding: 10px 20px; } /* ปุ่ม Undo */
+        
+        /* ปุ่ม Undo & Redo */
+        .btn-undo { background: #FF9500; color: white; font-size: 16px; padding: 10px 15px; } 
+        .btn-redo { background: #8E8E93; color: white; font-size: 16px; padding: 10px 15px; } 
         
         .tool-btn { background: #e0e0e0; color: #333; border: 2px solid transparent; transition: all 0.2s; }
         .tool-btn.active { border: 2px solid #007AFF; background: #d1e7dd; }
@@ -58,9 +60,6 @@
         .mode-draw canvas { touch-action: none; cursor: crosshair; pointer-events: auto; }
         .mode-scroll canvas { touch-action: auto; pointer-events: none; }
 
-        /* ========================================= */
-        /* 🌙 ธีมกลางคืน (ปรับให้มืดแค่ UI พื้นหลัง ไม่โดนกระดาษ) */
-        /* ========================================= */
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: #2c2c2c; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         body.dark-theme .bottom-row { background: #3a3a3a; }
@@ -74,19 +73,18 @@
 <body>
 
     <div class="header-tools">
-        <!-- แถวบน: สลับโหมด / เซฟ / Undo -->
         <div class="top-row">
             <button class="btn-back" onclick="window.location.href='index.html'">⬅️ กลับ</button>
             <button id="btnToggleMode" onclick="toggleMode()">✍️ โหมดวาด</button>
             
-            <!-- ✨ ปุ่ม Undo แบบ GoodNotes ✨ -->
+            <!-- ✨ ปุ่ม Undo & Redo ✨ -->
             <button class="btn-undo" onclick="undo()">↩️ ย้อนกลับ</button>
+            <button class="btn-redo" onclick="redo()">ทำซ้ำ ↪️</button>
             
             <button id="btnTheme" onclick="toggleTheme()">🌙 กลางคืน</button>
             <button class="btn-save" onclick="downloadAll()">💾 เซฟรูป</button>
         </div>
         
-        <!-- แถวล่าง: เครื่องมือ Pro -->
         <div class="bottom-row" id="drawingTools">
             <button class="tool-btn active" id="btnPen" onclick="setTool('pen', this)">🖊️ ปากกา</button>
             <button class="tool-btn" id="btnHighlighter" onclick="setTool('highlighter', this)">🖍️ ไฮไลท์</button>
@@ -126,26 +124,53 @@
         let backgroundImages = []; 
 
         // ==========================================
-        // 🌟 ระบบ UNDO (ย้อนกลับการกระทำ)
+        // 🌟 ระบบ UNDO / REDO
         // ==========================================
-        let globalUndoStack = []; // ตัวแปรเก็บประวัติการวาดทั้งหมด
+        let globalUndoStack = []; // เก็บประวัติวาด
+        let globalRedoStack = []; // เก็บประวัติที่โดนย้อนกลับไป (เผื่อทำซ้ำ)
 
         function undo() {
-            if (globalUndoStack.length === 0) return; // ถ้าไม่มีอะไรให้ย้อนกลับก็ไม่ต้องทำอะไร
+            if (globalUndoStack.length === 0) return;
             
-            // ดึงข้อมูลภาพล่าสุดออกมา
             const lastState = globalUndoStack.pop();
             const targetCanvas = document.getElementById(`canvas-page-${lastState.index}`);
             
             if (targetCanvas) {
                 const ctx = targetCanvas.getContext('2d');
-                // เอาภาพเก่าก่อนวาดเส้นล่าสุด มาแปะทับลงไป (ลบเส้นล่าสุดทิ้ง)
+                
+                // ก่อนจะย้อนกลับ ให้แอบเซฟภาพปัจจุบันไปเก็บไว้ในกล่อง Redo ก่อน
+                globalRedoStack.push({
+                    index: lastState.index,
+                    imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
+                });
+
+                // วาดภาพย้อนหลัง
                 ctx.putImageData(lastState.imageData, 0, 0);
             }
         }
 
+        function redo() {
+            if (globalRedoStack.length === 0) return;
+            
+            const nextState = globalRedoStack.pop();
+            const targetCanvas = document.getElementById(`canvas-page-${nextState.index}`);
+            
+            if (targetCanvas) {
+                const ctx = targetCanvas.getContext('2d');
+                
+                // ก่อนจะเดินหน้า ให้เซฟภาพปัจจุบันกลับไปไว้ในกล่อง Undo
+                globalUndoStack.push({
+                    index: nextState.index,
+                    imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
+                });
+
+                // วาดภาพไปข้างหน้า
+                ctx.putImageData(nextState.imageData, 0, 0);
+            }
+        }
+
         // ==========================================
-        // ระบบสลับกลางวัน / กลางคืน (แก้ให้กระดาษคงเดิมแล้ว!)
+        // ระบบอื่นๆ (กลางคืน, เปลี่ยนโหมด)
         // ==========================================
         function toggleTheme() {
             isDarkMode = !isDarkMode;
@@ -230,7 +255,6 @@
         }
 
         function setupDrawingSystem(canvas, pageIndex) {
-            // willReadFrequently ช่วยให้ระบบประมวลผลการเก็บ Undo ได้ลื่นไหลขึ้น
             const ctx = canvas.getContext('2d', { willReadFrequently: true }); 
             let isDrawing = false;
             let lastX = 0, lastY = 0;
@@ -246,14 +270,15 @@
             }
 
             canvas.addEventListener('pointerdown', (e) => {
-                // 💥 ทันทีที่ปากกาแตะจอ ให้เซฟรูปรอยวาดเก่าเก็บไว้ในประวัติ Undo ก่อน
+                // ก่อนขีดเขียน เซฟประวัติปัจจุบันไว้ใน Undo
                 globalUndoStack.push({
                     index: pageIndex,
                     imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
                 });
-                
-                // จำกัดให้จำประวัติแค่ 50 ครั้งล่าสุด (กันเครื่องหน่วง)
                 if (globalUndoStack.length > 50) globalUndoStack.shift();
+                
+                // ✨ สำคัญมาก: พอเริ่มเขียนเส้นใหม่ปุ๊บ ต้องล้างประวัติ Redo ทิ้งให้หมด ✨
+                globalRedoStack = [];
 
                 isDrawing = true;
                 const pos = getPos(e);
@@ -302,9 +327,6 @@
             canvas.addEventListener('pointercancel', stopDrawing);
         }
 
-        // ==========================================
-        // ระบบเซฟรูปภาพ
-        // ==========================================
         function downloadAll() {
             const canvases = document.querySelectorAll('canvas');
             if (canvases.length === 0) return;
