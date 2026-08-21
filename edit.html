@@ -18,11 +18,10 @@
 
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f5f7; text-align: center; margin: 0; padding: 0 0 20px 0; transition: background-color 0.3s; }
         
-        /* ✨ รีดีไซน์แถบเครื่องมือ (Glassmorphism) ✨ */
         .header-tools { 
             position: sticky; top: 0; z-index: 100;
             background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px); /* เอฟเฟกต์กระจกเบลอแบบ Apple */
+            backdrop-filter: blur(10px); 
             -webkit-backdrop-filter: blur(10px);
             padding: 12px 20px;
             border-bottom: 1px solid #e0e0e0;
@@ -30,7 +29,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         }
         
-        /* จัด Layout ซ้าย-ขวา */
         .top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 900px; margin: 0 auto; }
         .top-group { display: flex; gap: 8px; align-items: center; }
         
@@ -39,43 +37,25 @@
             max-width: 900px; margin: 0 auto;
         }
 
-        /* ✨ ดีไซน์ปุ่มแบบคลีน (Pro Button) ✨ */
         .btn-clean {
-            background: #f0f1f4;
-            color: #333;
-            border: none;
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex; align-items: center; justify-content: center;
+            background: #f0f1f4; color: #333; border: none; padding: 8px 14px;
+            border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;
         }
         .btn-clean:hover { background: #e2e4e9; }
         .btn-clean:active { transform: scale(0.95); }
         
-        /* ปุ่มลบ (สีแดงอ่อนๆ ไม่ตะโกน) */
         .btn-danger { color: #FF3B30; background: #ffebeb; }
         .btn-danger:hover { background: #ffd6d6; }
 
-        /* ปุ่มส่งออก (สีฟ้าเด่นสุด) */
         .btn-primary {
-            background: #007AFF;
-            color: white;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+            background: #007AFF; color: white; border: none; padding: 8px 18px;
+            border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer;
+            transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
         }
         .btn-primary:hover { background: #005bb5; }
         .btn-primary:active { transform: scale(0.95); }
 
-        /* เส้นแบ่งกลุ่มเครื่องมือ */
         .separator { width: 1px; height: 24px; background: #d1d1d6; margin: 0 5px; }
 
         .tool-btn { background: #f0f1f4; color: #555; border: 2px solid transparent; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s;}
@@ -111,7 +91,6 @@
         .btn-export.jpg { background: #34C759; }
         .btn-export.cancel { background: #f0f1f4; color: #333; margin-top: 15px; }
 
-        /* ✨ โหมดกลางคืน (อัปเดตสีให้เข้ากับ UI ใหม่) ✨ */
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: rgba(30, 30, 30, 0.9); border-bottom: 1px solid #333; }
         body.dark-theme .btn-clean { background: #2c2c2e; color: #eee; }
@@ -130,26 +109,20 @@
 <body>
 
     <div class="header-tools">
-        <!-- แถวบน: นำทาง & จัดการไฟล์ -->
         <div class="top-row">
-            <!-- ซ้าย: ปุ่มย้อนกลับ และ Undo/Redo -->
             <div class="top-group">
                 <button class="btn-clean" onclick="goBack()">‹ กลับ</button>
                 <div class="separator"></div>
                 <button class="btn-clean" onclick="undo()" title="ย้อนกลับ">↩</button>
                 <button class="btn-clean" onclick="redo()" title="ทำซ้ำ">↪</button>
             </div>
-            
-            <!-- ขวา: ตัวเลือก และ ส่งออก (ขวาบนสุด) -->
             <div class="top-group">
                 <button class="btn-clean" id="btnTheme" onclick="toggleTheme()" title="สลับโหมดสี">🌙</button>
                 <button class="btn-clean btn-danger" onclick="clearDraft()">ล้าง</button>
-                <!-- ปุ่มส่งออก โดดเด่นสุด -->
                 <button class="btn-primary" onclick="openExportModal()">ส่งออก</button>
             </div>
         </div>
         
-        <!-- แถวล่าง: เครื่องมือวาดเขียน -->
         <div class="bottom-row" id="drawingTools">
             <button class="tool-btn active" id="btnPen" onclick="setTool('pen', this)">🖊️ ปากกา</button>
             <button class="tool-btn" id="btnHighlighter" onclick="setTool('highlighter', this)">🖍️ ไฮไลท์</button>
@@ -168,7 +141,6 @@
 
     <div id="workspace"></div>
 
-    <!-- หน้าต่าง Popup สำหรับเซฟไฟล์ -->
     <div id="exportModal" class="modal-overlay">
         <div class="modal-content">
             <h3>💾 เลือกรูปแบบไฟล์</h3>
@@ -179,6 +151,54 @@
         </div>
     </div>
 
+    <!-- Script สำหรับดึงข้อมูล Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD6X-sBEO8AqZF2i0qzJqyrwLU5FVtqQ5s",
+            authDomain: "ipad-drawing-app.firebaseapp.com",
+            projectId: "ipad-drawing-app",
+            storageBucket: "ipad-drawing-app.firebasestorage.app",
+            messagingSenderId: "1039285685408",
+            appId: "1:1039285685408:web:d1ae93d102084e2c3c0dc5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const docId = urlParams.get('id');
+        const imageUrlFromUrl = urlParams.get('img'); // เผื่อรองรับลิงก์เก่าที่ค้างอยู่ในระบบ
+
+        async function init() {
+            if (docId) {
+                try {
+                    const docRef = doc(db, "workbooks", docId);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        // ดึง URL แล้วส่งให้ระบบวาดเขียนทำงานต่อ
+                        window.initializeWorkspace(docSnap.data().url);
+                    } else {
+                        alert("ไม่พบข้อมูลแบบฝึกหัดนี้");
+                        window.location.href = 'index.html';
+                    }
+                } catch (e) {
+                    alert("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+                }
+            } else if (imageUrlFromUrl) {
+                window.initializeWorkspace(imageUrlFromUrl);
+            } else {
+                alert("ไม่พบข้อมูลที่ต้องการ");
+                window.location.href = 'index.html';
+            }
+        }
+
+        init();
+    </script>
+
+    <!-- Script ควบคุมระบบวาดเขียน (คงเดิม แต่รับค่า URL จากฟังก์ชัน initializeWorkspace) -->
     <script>
         let isSafeToLeave = false; 
 
@@ -272,18 +292,13 @@
             }
         }
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const imageUrlFromUrl = urlParams.get('img');
-
-        if (imageUrlFromUrl) {
-            const pages = imageUrlFromUrl.split('|').map(url => url.trim());
+        // ✨ ฟังก์ชันสำหรับรับค่า URL ที่ดึงมาจาก Firebase
+        window.initializeWorkspace = function(imageUrls) {
+            const pages = imageUrls.split('|').map(url => url.trim());
             pages.forEach((url, index) => {
                 createCanvasPage(url, index);
             });
-        } else {
-            alert("ไม่พบข้อมูลรูปภาพ");
-            window.location.href = 'index.html';
-        }
+        };
 
         function createCanvasPage(url, index) {
             const wrapper = document.createElement('div');
