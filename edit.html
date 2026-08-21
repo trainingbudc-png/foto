@@ -37,6 +37,14 @@
             max-width: 900px; margin: 0 auto;
         }
 
+        /* ส่วนเปลี่ยนหน้า (ใหม่) */
+        .pagination-bar {
+            display: flex; justify-content: center; align-items: center; gap: 15px;
+            width: 100%; max-width: 900px; margin: 5px auto 0 auto;
+            padding-top: 15px; border-top: 1px solid #e0e0e0;
+        }
+        #pageIndicator { font-size: 15px; font-weight: bold; color: #333; min-width: 80px; }
+
         .btn-clean {
             background: #f0f1f4; color: #333; border: none; padding: 8px 14px;
             border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
@@ -44,6 +52,7 @@
         }
         .btn-clean:hover { background: #e2e4e9; }
         .btn-clean:active { transform: scale(0.95); }
+        .btn-clean:disabled { opacity: 0.5; cursor: not-allowed; }
         
         .btn-danger { color: #FF3B30; background: #ffebeb; }
         .btn-danger:hover { background: #ffd6d6; }
@@ -93,8 +102,10 @@
 
         body.dark-theme { background-color: #121212; }
         body.dark-theme .header-tools { background: rgba(30, 30, 30, 0.9); border-bottom: 1px solid #333; }
+        body.dark-theme .pagination-bar { border-top-color: #333; }
+        body.dark-theme #pageIndicator { color: #eee; }
         body.dark-theme .btn-clean { background: #2c2c2e; color: #eee; }
-        body.dark-theme .btn-clean:hover { background: #3a3a3c; }
+        body.dark-theme .btn-clean:hover:not(:disabled) { background: #3a3a3c; }
         body.dark-theme .btn-danger { color: #ff6b63; background: #3a1c1c; }
         body.dark-theme .tool-btn { background: #2c2c2e; color: #aaa; }
         body.dark-theme .tool-btn.active { background: #1c3552; border-color: #0a84ff; color: #0a84ff;}
@@ -127,15 +138,18 @@
             <button class="tool-btn active" id="btnPen" onclick="setTool('pen', this)">🖊️ ปากกา</button>
             <button class="tool-btn" id="btnHighlighter" onclick="setTool('highlighter', this)">🖍️ ไฮไลท์</button>
             <button class="tool-btn" id="btnEraser" onclick="setTool('eraser', this)">🧽 ยางลบ</button>
-            
             <div class="separator"></div>
-            
             <label class="slider-group">สี: <input type="color" id="colorPicker" value="#000000" onchange="currentColor = this.value; setTool(currentTool === 'eraser' ? 'pen' : currentTool, currentTool === 'eraser' ? document.getElementById('btnPen') : null)"></label>
-            
             <div class="separator"></div>
-            
             <div class="slider-group">ขนาด: <input type="range" id="sizeSlider" min="1" max="50" value="5" oninput="currentSize = parseInt(this.value)"></div>
             <div class="slider-group">เข้ม: <input type="range" id="opacitySlider" min="0.1" max="1" step="0.1" value="1" oninput="currentOpacity = parseFloat(this.value)"></div>
+        </div>
+
+        <!-- ✨ ส่วนระบบเปลี่ยนหน้า ✨ -->
+        <div class="pagination-bar" id="paginationBar" style="display: none;">
+            <button class="btn-clean" id="btnPrevPage" onclick="prevPage()">◀ ก่อนหน้า</button>
+            <span id="pageIndicator">หน้า 1 / 1</span>
+            <button class="btn-clean" id="btnNextPage" onclick="nextPage()">ถัดไป ▶</button>
         </div>
     </div>
 
@@ -144,9 +158,9 @@
     <div id="exportModal" class="modal-overlay">
         <div class="modal-content">
             <h3>💾 เลือกรูปแบบไฟล์</h3>
-            <button class="btn-export pdf" onclick="executeDownload('pdf')">📄 PDF (รวมหน้า)</button>
-            <button class="btn-export png" onclick="executeDownload('png')">🖼️ PNG (ภาพชัดเจน)</button>
-            <button class="btn-export jpg" onclick="executeDownload('jpg')">📸 JPG (ไฟล์ขนาดเล็ก)</button>
+            <button class="btn-export pdf" onclick="executeDownload('pdf')">📄 PDF (รวมทุกหน้า)</button>
+            <button class="btn-export png" onclick="executeDownload('png')">🖼️ PNG (เฉพาะหน้านี้)</button>
+            <button class="btn-export jpg" onclick="executeDownload('jpg')">📸 JPG (เฉพาะหน้านี้)</button>
             <button class="btn-export cancel" onclick="closeExportModal()">ยกเลิก</button>
         </div>
     </div>
@@ -167,10 +181,8 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
         const urlParams = new URLSearchParams(window.location.search);
         const docId = urlParams.get('id');
-        const imageUrlFromUrl = urlParams.get('img'); // เผื่อรองรับลิงก์เก่าที่ค้างอยู่ในระบบ
 
         async function init() {
             if (docId) {
@@ -178,44 +190,30 @@
                     const docRef = doc(db, "workbooks", docId);
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
-                        // ดึง URL แล้วส่งให้ระบบวาดเขียนทำงานต่อ
                         window.initializeWorkspace(docSnap.data().url);
                     } else {
-                        alert("ไม่พบข้อมูลแบบฝึกหัดนี้");
-                        window.location.href = 'index.html';
+                        alert("ไม่พบข้อมูลแบบฝึกหัดนี้"); window.location.href = 'index.html';
                     }
                 } catch (e) {
                     alert("เกิดข้อผิดพลาดในการโหลดข้อมูล");
                 }
-            } else if (imageUrlFromUrl) {
-                window.initializeWorkspace(imageUrlFromUrl);
             } else {
-                alert("ไม่พบข้อมูลที่ต้องการ");
-                window.location.href = 'index.html';
+                alert("ไม่พบข้อมูลที่ต้องการ"); window.location.href = 'index.html';
             }
         }
-
         init();
     </script>
 
-    <!-- Script ควบคุมระบบวาดเขียน (คงเดิม แต่รับค่า URL จากฟังก์ชัน initializeWorkspace) -->
+    <!-- Script ควบคุมระบบวาดเขียน -->
     <script>
         let isSafeToLeave = false; 
-
-        window.addEventListener('beforeunload', function (e) {
-            if (!isSafeToLeave) {
-                e.preventDefault(); e.returnValue = ''; 
-            }
-        });
-
+        window.addEventListener('beforeunload', function (e) { if (!isSafeToLeave) { e.preventDefault(); e.returnValue = ''; } });
         window.history.pushState(null, null, window.location.href);
         window.addEventListener('popstate', function (event) {
             if (!isSafeToLeave) {
                 if(confirm('คุณต้องการออกจากหน้านี้ใช่ไหม?\n(ข้อมูลลายมือที่ยังไม่ได้กดเซฟจะหายไปนะ)')) {
                     isSafeToLeave = true; window.history.back(); 
-                } else {
-                    window.history.pushState(null, null, window.location.href);
-                }
+                } else { window.history.pushState(null, null, window.location.href); }
             }
         });
 
@@ -229,26 +227,37 @@
         let currentColor = '#000000';
         let currentSize = 5;
         let currentOpacity = 1.0;
-        let backgroundImages = []; 
-
+        
         let globalUndoStack = []; 
         let globalRedoStack = []; 
+        
+        // ✨ ตัวแปรระบบเปลี่ยนหน้า ✨
+        let allPageUrls = [];
+        let currentPageIndex = 0;
+
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-theme', isDarkMode);
+            document.getElementById('btnTheme').innerHTML = isDarkMode ? '☀️' : '🌙'; 
+        }
+
+        function setTool(tool, btnElement) {
+            currentTool = tool;
+            const btns = drawingTools.querySelectorAll('.tool-btn');
+            btns.forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+            else document.getElementById(tool === 'highlighter' ? 'btnHighlighter' : 'btnPen').classList.add('active');
+        }
 
         function undo() {
             if (globalUndoStack.length === 0) return;
             const lastState = globalUndoStack.pop();
             const targetCanvas = document.getElementById(`canvas-page-${lastState.index}`);
-            
             if (targetCanvas) {
                 const ctx = targetCanvas.getContext('2d');
-                globalRedoStack.push({
-                    index: lastState.index,
-                    imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
-                });
+                globalRedoStack.push({ index: lastState.index, imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height) });
                 ctx.putImageData(lastState.imageData, 0, 0);
-                
-                const storageKey = targetCanvas.getAttribute('data-storage-key');
-                localStorage.setItem(storageKey, targetCanvas.toDataURL('image/png'));
+                saveCurrentCanvas();
             }
         }
 
@@ -256,49 +265,51 @@
             if (globalRedoStack.length === 0) return;
             const nextState = globalRedoStack.pop();
             const targetCanvas = document.getElementById(`canvas-page-${nextState.index}`);
-            
             if (targetCanvas) {
                 const ctx = targetCanvas.getContext('2d');
-                globalUndoStack.push({
-                    index: nextState.index,
-                    imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height)
-                });
+                globalUndoStack.push({ index: nextState.index, imageData: ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height) });
                 ctx.putImageData(nextState.imageData, 0, 0);
-                
-                const storageKey = targetCanvas.getAttribute('data-storage-key');
-                localStorage.setItem(storageKey, targetCanvas.toDataURL('image/png'));
+                saveCurrentCanvas();
             }
         }
 
-        function toggleTheme() {
-            isDarkMode = !isDarkMode;
-            document.body.classList.toggle('dark-theme', isDarkMode);
-            const btn = document.getElementById('btnTheme');
-            if (isDarkMode) {
-                btn.innerHTML = '☀️'; 
-            } else {
-                btn.innerHTML = '🌙'; 
-            }
-        }
-
-        function setTool(tool, btnElement) {
-            currentTool = tool;
-            const btns = drawingTools.querySelectorAll('.tool-btn');
-            btns.forEach(b => b.classList.remove('active'));
-            if(btnElement) {
-                btnElement.classList.add('active');
-            } else {
-                document.getElementById(tool === 'highlighter' ? 'btnHighlighter' : 'btnPen').classList.add('active');
-            }
-        }
-
-        // ✨ ฟังก์ชันสำหรับรับค่า URL ที่ดึงมาจาก Firebase
+        // ✨ ฟังก์ชันจัดการหน้า ✨
         window.initializeWorkspace = function(imageUrls) {
-            const pages = imageUrls.split('|').map(url => url.trim());
-            pages.forEach((url, index) => {
-                createCanvasPage(url, index);
-            });
+            allPageUrls = imageUrls.split('|').map(url => url.trim());
+            currentPageIndex = 0;
+            document.getElementById('paginationBar').style.display = allPageUrls.length > 1 ? 'flex' : 'none';
+            renderCurrentPage();
         };
+
+        function renderCurrentPage() {
+            workspace.innerHTML = ''; 
+            globalUndoStack = []; globalRedoStack = [];
+            createCanvasPage(allPageUrls[currentPageIndex], currentPageIndex);
+            
+            document.getElementById('pageIndicator').innerText = `หน้า ${currentPageIndex + 1} / ${allPageUrls.length}`;
+            document.getElementById('btnPrevPage').disabled = currentPageIndex === 0;
+            document.getElementById('btnNextPage').disabled = currentPageIndex === allPageUrls.length - 1;
+        }
+
+        window.prevPage = function() {
+            if(currentPageIndex > 0) {
+                saveCurrentCanvas(); currentPageIndex--; renderCurrentPage();
+            }
+        };
+
+        window.nextPage = function() {
+            if(currentPageIndex < allPageUrls.length - 1) {
+                saveCurrentCanvas(); currentPageIndex++; renderCurrentPage();
+            }
+        };
+
+        function saveCurrentCanvas() {
+            const canvas = document.getElementById(`canvas-page-${currentPageIndex}`);
+            if(canvas) {
+                const storageKey = canvas.getAttribute('data-storage-key');
+                try { localStorage.setItem(storageKey, canvas.toDataURL('image/png')); } catch(e) {}
+            }
+        }
 
         function createCanvasPage(url, index) {
             const wrapper = document.createElement('div');
@@ -321,11 +332,8 @@
             draftCanvas.className = "draft-canvas";
             
             img.onload = () => {
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
-                draftCanvas.width = img.naturalWidth;
-                draftCanvas.height = img.naturalHeight;
-                backgroundImages[index] = img; 
+                canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+                draftCanvas.width = img.naturalWidth; draftCanvas.height = img.naturalHeight;
                 
                 const savedDraft = localStorage.getItem(storageKey);
                 if (savedDraft) {
@@ -333,23 +341,15 @@
                     draftImg.onload = () => {
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(draftImg, 0, 0);
-                        globalUndoStack.push({
-                            index: index,
-                            imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
-                        });
+                        globalUndoStack.push({ index: index, imageData: ctx.getImageData(0, 0, canvas.width, canvas.height) });
                     };
                     draftImg.src = savedDraft;
                 } else {
-                    globalUndoStack.push({
-                        index: index,
-                        imageData: canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height)
-                    });
+                    globalUndoStack.push({ index: index, imageData: canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height) });
                 }
             };
 
-            wrapper.appendChild(img);
-            wrapper.appendChild(canvas);
-            wrapper.appendChild(draftCanvas);
+            wrapper.appendChild(img); wrapper.appendChild(canvas); wrapper.appendChild(draftCanvas);
             workspace.appendChild(wrapper);
 
             setupDrawingSystem(canvas, draftCanvas, index, storageKey);
@@ -373,7 +373,6 @@
                 globalRedoStack = [];
 
                 isDrawing = true; lastX = x; lastY = y;
-                
                 if (currentTool === 'highlighter') { draftCanvas.style.opacity = currentOpacity * 0.3; } 
                 else if (currentTool === 'pen') { draftCanvas.style.opacity = currentOpacity; }
             }
@@ -408,8 +407,7 @@
                         ctx.drawImage(draftCanvas, 0, 0);
                         draftCtx.clearRect(0, 0, draftCanvas.width, draftCanvas.height);
                     }
-                    isDrawing = false;
-                    try { localStorage.setItem(storageKey, canvas.toDataURL('image/png')); } catch(e) {}
+                    isDrawing = false; saveCurrentCanvas();
                 }
             }
 
@@ -435,14 +433,15 @@
         }
 
         function clearDraft() {
-            if(confirm('ต้องการลบลายมือทั้งหมด เพื่อเริ่มทำใหม่ใช่หรือไม่?')) {
-                const canvases = document.querySelectorAll('.main-canvas');
-                canvases.forEach((canvas) => {
+            if(confirm('ต้องการลบลายมือหน้านี้ เพื่อเริ่มทำใหม่ใช่หรือไม่?')) {
+                const canvas = document.getElementById(`canvas-page-${currentPageIndex}`);
+                if(canvas) {
                     const ctx = canvas.getContext('2d');
                     ctx.clearRect(0, 0, canvas.width, canvas.height); 
                     localStorage.removeItem(canvas.getAttribute('data-storage-key')); 
-                });
-                globalUndoStack = []; globalRedoStack = [];
+                    globalUndoStack = [{ index: currentPageIndex, imageData: ctx.getImageData(0,0,canvas.width,canvas.height) }];
+                    globalRedoStack = [];
+                }
             }
         }
 
@@ -450,70 +449,79 @@
         function openExportModal() { modal.style.display = 'flex'; }
         function closeExportModal() { modal.style.display = 'none'; }
 
-        async function executeDownload(format) {
-            closeExportModal(); 
-            isSafeToLeave = true; 
+        // ฟังก์ชันโหลดรูปภาพแบบ Promise
+        function loadImage(src) {
+            return new Promise((resolve) => {
+                const img = new Image(); img.crossOrigin = "anonymous";
+                img.onload = () => resolve(img); img.src = src;
+            });
+        }
 
-            const canvases = document.querySelectorAll('.main-canvas');
-            if (canvases.length === 0) return;
+        // ✨ อัปเกรดระบบส่งออกไฟล์ (รองรับระบบเปลี่ยนหน้า) ✨
+        async function executeDownload(format) {
+            closeExportModal(); isSafeToLeave = true; 
             const btnSave = document.querySelector('.btn-primary');
             const originalText = btnSave.innerHTML;
-            btnSave.innerHTML = "⏳ กำลังเซฟ...";
+            
+            saveCurrentCanvas(); // เซฟหน้าปัจจุบันลงหน่วยความจำก่อนโหลด
 
             if (format === 'pdf') {
                 const { jsPDF } = window.jspdf;
                 let pdf;
                 
-                setTimeout(() => {
-                    for (let i = 0; i < canvases.length; i++) {
-                        const drawCanvas = canvases[i];
-                        const exportCanvas = document.createElement('canvas');
-                        exportCanvas.width = drawCanvas.width; exportCanvas.height = drawCanvas.height;
-                        const ctx = exportCanvas.getContext('2d');
+                for (let i = 0; i < allPageUrls.length; i++) {
+                    btnSave.innerHTML = `⏳ สร้าง PDF (${i + 1}/${allPageUrls.length})...`;
+                    const imgUrl = allPageUrls[i];
+                    const storageKey = "draft_" + i + "_" + encodeURIComponent(imgUrl).slice(-40);
+                    const savedDraft = localStorage.getItem(storageKey);
 
-                        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-                        if (backgroundImages[i]) ctx.drawImage(backgroundImages[i], 0, 0);
-                        ctx.drawImage(drawCanvas, 0, 0);
+                    const bgImg = await loadImage(imgUrl);
+                    const exportCanvas = document.createElement('canvas');
+                    exportCanvas.width = bgImg.naturalWidth; exportCanvas.height = bgImg.naturalHeight;
+                    const ctx = exportCanvas.getContext('2d');
 
-                        const imgData = exportCanvas.toDataURL('image/jpeg', 0.9);
-                        const orientation = exportCanvas.width > exportCanvas.height ? 'l' : 'p';
-                        
-                        if (i === 0) {
-                            pdf = new jsPDF({ orientation: orientation, unit: 'px', format: [exportCanvas.width, exportCanvas.height] });
-                        } else {
-                            pdf.addPage([exportCanvas.width, exportCanvas.height], orientation);
-                        }
-                        pdf.addImage(imgData, 'JPEG', 0, 0, exportCanvas.width, exportCanvas.height);
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+                    ctx.drawImage(bgImg, 0, 0);
+
+                    if (savedDraft) {
+                        const draftImg = await loadImage(savedDraft);
+                        ctx.drawImage(draftImg, 0, 0);
                     }
-                    pdf.save('แบบฝึกหัด-ส่งงาน.pdf'); 
-                    btnSave.innerHTML = originalText;
-                    isSafeToLeave = false;
-                }, 100);
+
+                    const imgData = exportCanvas.toDataURL('image/jpeg', 0.8);
+                    const orientation = exportCanvas.width > exportCanvas.height ? 'l' : 'p';
+                    
+                    if (i === 0) pdf = new jsPDF({ orientation: orientation, unit: 'px', format: [exportCanvas.width, exportCanvas.height] });
+                    else pdf.addPage([exportCanvas.width, exportCanvas.height], orientation);
+                    
+                    pdf.addImage(imgData, 'JPEG', 0, 0, exportCanvas.width, exportCanvas.height);
+                }
+                btnSave.innerHTML = "⏳ กำลังดาวน์โหลด...";
+                pdf.save('แบบฝึกหัด-ส่งงาน.pdf'); 
             } 
             else {
-                canvases.forEach((drawCanvas, index) => {
-                    setTimeout(() => {
-                        const exportCanvas = document.createElement('canvas');
-                        exportCanvas.width = drawCanvas.width; exportCanvas.height = drawCanvas.height;
-                        const ctx = exportCanvas.getContext('2d');
+                btnSave.innerHTML = "⏳ กำลังเซฟรูป...";
+                const imgUrl = allPageUrls[currentPageIndex];
+                const storageKey = "draft_" + currentPageIndex + "_" + encodeURIComponent(imgUrl).slice(-40);
+                const savedDraft = localStorage.getItem(storageKey);
 
-                        if (format === 'jpg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height); }
-                        if (backgroundImages[index]) ctx.drawImage(backgroundImages[index], 0, 0);
-                        ctx.drawImage(drawCanvas, 0, 0);
+                const bgImg = await loadImage(imgUrl);
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = bgImg.naturalWidth; exportCanvas.height = bgImg.naturalHeight;
+                const ctx = exportCanvas.getContext('2d');
 
-                        const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
-                        const link = document.createElement('a');
-                        link.download = `แบบฝึกหัด-หน้าที่${index + 1}.${format}`;
-                        link.href = exportCanvas.toDataURL(mimeType, 0.9);
-                        link.click();
-                        
-                        if(index === canvases.length - 1) {
-                            btnSave.innerHTML = originalText;
-                            isSafeToLeave = false;
-                        }
-                    }, index * 400); 
-                });
+                if (format === 'jpg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height); }
+                ctx.drawImage(bgImg, 0, 0);
+                if (savedDraft) { const draftImg = await loadImage(savedDraft); ctx.drawImage(draftImg, 0, 0); }
+
+                const mimeType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+                const link = document.createElement('a');
+                link.download = `แบบฝึกหัด-หน้า${currentPageIndex + 1}.${format}`;
+                link.href = exportCanvas.toDataURL(mimeType, 0.9); link.click();
             }
+            
+            btnSave.innerHTML = originalText;
+            isSafeToLeave = false;
         }
     </script>
 </body>
