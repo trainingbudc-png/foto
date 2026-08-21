@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบหลังบ้าน (แอดมิน)</title>
+    <!-- ✨ นำเข้าไลบรารีสำหรับอ่านไฟล์ PDF ✨ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        // ตั้งค่าการทำงานเบื้องหลังให้ PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
     <style>
         body { font-family: sans-serif; background-color: #f4f4f4; text-align: center; padding: 40px 20px; margin: 0; }
         
@@ -19,7 +25,6 @@
             border: 2px solid #ddd; border-radius: 8px; font-size: 16px;
         }
         
-        /* สไตล์ช่องค้นหาหน้าแอดมิน */
         .search-box {
             width: 100%; padding: 12px; margin-bottom: 15px; 
             border: 2px solid #007AFF; border-radius: 8px; font-size: 16px;
@@ -64,23 +69,22 @@
     <!-- ส่วนที่ 1: อัปโหลด -->
     <div class="box">
         <h2>📁 เพิ่มแบบฝึกหัดใหม่</h2>
-        <p>อัปโหลดรูปลงระบบ ฐานข้อมูลจะอัปเดตทันที</p>
+        <!-- ✨ อัปเดตให้รองรับทั้ง PDF และรูปภาพ ✨ -->
+        <p>รองรับไฟล์รูปภาพ (JPG, PNG) และไฟล์ PDF (จะดึงเฉพาะหน้าแรก)</p>
 
         <input type="text" id="fileName" placeholder="ตั้งชื่อแบบฝึกหัด..." required>
-        <input type="file" id="fileInput" accept="image/*" required>
+        <!-- ✨ แก้ไข accept ให้รับ application/pdf ได้ด้วย ✨ -->
+        <input type="file" id="fileInput" accept="image/*, application/pdf" required>
         
         <button id="uploadBtn" class="btn-upload">🚀 อัปโหลดเข้าสู่ระบบ</button>
         <div id="status"></div>
     </div>
 
-    <!-- ส่วนที่ 2: จัดการข้อมูล (ลบ + ค้นหา) -->
+    <!-- ส่วนที่ 2: จัดการข้อมูล -->
     <div class="box">
         <h3>🗑️ จัดการแบบฝึกหัดที่มีอยู่</h3>
         <p style="color: #666; font-size: 14px; margin-bottom: 20px;">รายการทั้งหมดในระบบ (ลบแล้วข้อมูลจะหายไปจากหน้าแรกทันที)</p>
-        
-        <!-- ✨ เพิ่มช่องพิมพ์ค้นหา (Filter) ✨ -->
         <input type="text" id="adminSearchInput" class="search-box" placeholder="🔍 พิมพ์ชื่อแบบฝึกหัดเพื่อกรองหา...">
-
         <div id="adminGallery" class="list-container">
             <div class="loading" style="text-align: center;">⏳ กำลังโหลดข้อมูล...</div>
         </div>
@@ -106,47 +110,31 @@
 
         const adminGallery = document.getElementById('adminGallery');
         const adminSearchInput = document.getElementById('adminSearchInput');
-        
-        // ตัวแปรเก็บข้อมูลทั้งหมด เพื่อใช้กรองโดยไม่ต้องโหลดใหม่
         let allAdminItems = []; 
 
-        // ==========================================
-        // 1. ระบบโหลดและแสดงข้อมูล
-        // ==========================================
         async function loadAdminGallery() {
             adminGallery.innerHTML = '<div class="loading" style="text-align: center;">⏳ กำลังโหลดข้อมูล...</div>';
             try {
                 const q = query(collection(db, "workbooks"), orderBy("createdAt", "desc"));
                 const querySnapshot = await getDocs(q);
-                
-                allAdminItems = []; // เคลียร์ของเก่าก่อน
+                allAdminItems = []; 
                 
                 if(querySnapshot.empty) {
                     adminGallery.innerHTML = "<p style='text-align: center; color: #888;'>ยังไม่มีแบบฝึกหัดในระบบ</p>";
                     return;
                 }
 
-                // เก็บข้อมูลลง Array
                 querySnapshot.forEach((documentSnapshot) => {
-                    allAdminItems.push({
-                        id: documentSnapshot.id,
-                        ...documentSnapshot.data()
-                    });
+                    allAdminItems.push({ id: documentSnapshot.id, ...documentSnapshot.data() });
                 });
-
-                // นำไปแสดงผล
                 renderAdminList(allAdminItems);
-
             } catch (error) {
-                console.error(error);
                 adminGallery.innerHTML = "<p class='error' style='text-align: center;'>❌ ไม่สามารถโหลดข้อมูลได้</p>";
             }
         }
 
-        // ฟังก์ชันสร้างรายชื่อเพื่อแสดงผล (รองรับการกรอง)
         function renderAdminList(itemsToRender) {
             adminGallery.innerHTML = ''; 
-            
             if (itemsToRender.length === 0) {
                 adminGallery.innerHTML = "<p style='text-align: center; color: #888;'>ไม่พบแบบฝึกหัดที่ค้นหา</p>";
                 return;
@@ -155,52 +143,46 @@
             itemsToRender.forEach((data) => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'list-item';
-                
                 itemDiv.innerHTML = `
                     <div class="list-info">
                         <img src="${data.url}" alt="${data.name}">
                         <span class="list-name">${data.name}</span>
                     </div>
                 `;
-
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn-delete';
                 deleteBtn.innerHTML = "🗑️ ลบ";
                 
                 deleteBtn.onclick = async () => {
-                    const confirmDelete = confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบแบบฝึกหัด: "${data.name}" ?\n\n(หากลบแล้วจะไม่สามารถกู้คืนได้)`);
+                    const confirmDelete = confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบแบบฝึกหัด: "${data.name}" ?`);
                     if (confirmDelete) {
                         deleteBtn.innerHTML = "⏳ กำลังลบ...";
                         deleteBtn.disabled = true;
                         try {
                             await deleteDoc(doc(db, "workbooks", data.id));
-                            loadAdminGallery(); // รีเฟรชข้อมูลใหม่
-                            adminSearchInput.value = ''; // ล้างช่องค้นหา
+                            loadAdminGallery(); 
+                            adminSearchInput.value = ''; 
                         } catch (error) {
-                            alert("❌ เกิดข้อผิดพลาดในการลบ กรุณาลองใหม่");
-                            deleteBtn.innerHTML = "🗑️ ลบ";
+                            alert("❌ เกิดข้อผิดพลาดในการลบ");
                             deleteBtn.disabled = false;
                         }
                     }
                 };
-
                 itemDiv.appendChild(deleteBtn);
                 adminGallery.appendChild(itemDiv);
             });
         }
 
-        // ✨ ระบบกรองข้อมูลเมื่อพิมพ์ (Real-time Filter) ✨
         adminSearchInput.addEventListener('input', (e) => {
             const searchText = e.target.value.toLowerCase();
             const filteredData = allAdminItems.filter(item => item.name.toLowerCase().includes(searchText));
             renderAdminList(filteredData);
         });
 
-        // โหลดรายการทันทีเมื่อเปิดหน้าเว็บ
         loadAdminGallery();
 
         // ==========================================
-        // 2. ระบบอัปโหลด
+        // ✨ ฟังก์ชันอัปโหลด (รองรับ PDF)
         // ==========================================
         document.getElementById('uploadBtn').addEventListener('click', async () => {
             const fileName = document.getElementById('fileName').value;
@@ -209,17 +191,44 @@
             const btn = document.getElementById('uploadBtn');
 
             if (!fileName || !fileInput) {
-                alert('กรุณากรอกชื่อและเลือกไฟล์รูปภาพ');
+                alert('กรุณากรอกชื่อและเลือกไฟล์');
                 return;
             }
 
-            statusDiv.innerHTML = "⏳ กำลังอัปโหลดรูปภาพไปยัง Server...";
             statusDiv.className = "loading";
             btn.disabled = true;
+            
+            let fileToUpload = fileInput;
 
             try {
+                // 🛠️ ถ้าเป็นไฟล์ PDF ให้แอบแปลงเป็นรูปภาพก่อน
+                if (fileInput.type === "application/pdf") {
+                    statusDiv.innerHTML = "⏳ กำลังแปลงไฟล์ PDF เป็นรูปภาพ (หน้าแรก)...";
+                    
+                    const arrayBuffer = await fileInput.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    const page = await pdf.getPage(1); // ดึงมาแค่หน้า 1
+                    
+                    // ตั้งความคมชัด (Scale 2.0 คือชัดระดับ HD)
+                    const viewport = page.getViewport({ scale: 2.0 }); 
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    // วาด PDF ลงบน Canvas ชั่วคราว
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                    
+                    // แปลง Canvas เป็นไฟล์รูปภาพ (JPG)
+                    fileToUpload = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                }
+
+                statusDiv.innerHTML = "⏳ กำลังอัปโหลดไปยัง Server...";
+                
                 const formData = new FormData();
-                formData.append('image', fileInput);
+                // แนบไฟล์ที่อาจจะผ่านการแปลงมาแล้ว ส่งให้ ImgBB
+                formData.append('image', fileToUpload, "worksheet.jpg");
+                
                 const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
                     method: 'POST',
                     body: formData
@@ -241,11 +250,12 @@
                 
                 document.getElementById('fileName').value = '';
                 document.getElementById('fileInput').value = '';
-                adminSearchInput.value = ''; // ล้างช่องค้นหาเผื่อค้างไว้
+                adminSearchInput.value = ''; 
 
-                loadAdminGallery(); // รีเฟรชรายการหลังอัปโหลด
+                loadAdminGallery(); 
 
             } catch (error) {
+                console.error(error);
                 statusDiv.innerHTML = "❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
                 statusDiv.className = "error";
             } finally {
